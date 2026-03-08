@@ -1,5 +1,5 @@
 torch
-transformers==4.40.2
+transformers==4.53.0
 PyTDC
 scikit-learn
 scipy
