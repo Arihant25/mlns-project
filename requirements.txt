@@ -1,0 +1,7 @@
+torch
+transformers==4.40.2
+PyTDC
+scikit-learn
+scipy
+requests
+rdkit
