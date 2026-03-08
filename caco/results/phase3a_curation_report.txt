@@ -1,0 +1,21 @@
+Phase 3A — Dataset Curation Report
+====================================
+Total training molecules : 637
+
+--- Remove top 5% (threshold u > 0.224391) ---
+  Kept     :  605 molecules  |  MAE = 0.3582
+  Removed  :   32 molecules  |  MAE = 0.7623
+  MAE ratio (removed / kept) : 2.13x
+  Saved    : train_embeddings_curated_05.pt, train_targets_curated_05.pt
+
+--- Remove top 10% (threshold u > 0.189264) ---
+  Kept     :  573 molecules  |  MAE = 0.3420
+  Removed  :   64 molecules  |  MAE = 0.7053
+  MAE ratio (removed / kept) : 2.06x
+  Saved    : train_embeddings_curated_10.pt, train_targets_curated_10.pt
+
+--- Remove top 15% (threshold u > 0.173988) ---
+  Kept     :  541 molecules  |  MAE = 0.3357
+  Removed  :   96 molecules  |  MAE = 0.6198
+  MAE ratio (removed / kept) : 1.85x
+  Saved    : train_embeddings_curated_15.pt, train_targets_curated_15.pt

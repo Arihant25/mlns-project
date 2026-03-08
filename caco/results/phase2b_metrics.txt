@@ -1,0 +1,11 @@
+Phase 2B — Evidential GSL Test Metrics
+=======================================
+RMSE                          : 0.4436
+MAE                           : 0.3648
+Pearson  (r)                  : 0.7742
+Spearman (ρ)                  : 0.7299
+
+Mean Aleatoric Uncertainty    : 0.1155
+Spearman(u, |error|)          : 0.0449
+
+Model weights                 : /home/ineshshukla/dev/mlns/mlns-project/gsl/../results/evidential_gsl.pt
