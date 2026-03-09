@@ -1,0 +1,12 @@
+XGBoost (MolFormer Embeddings) — Golden Comparison (Multi-Seed)
+================================================================
+Seeds: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]  (10 runs per dataset)
+Architecture: XGBRegressor(n_estimators=300, lr=0.05, max_depth=3, colsample_bytree=0.3, subsample=0.8, reg_alpha=1.0, reg_lambda=1.0)
+
+Dataset                      N            RMSE             MAE         Pearson        Spearman
+──────────────────────────────────────────────────────────────────────────────────────────────
+Original (100%)            637  0.4770±0.0169  0.4000±0.0157  0.7277±0.0213  0.6954±0.0277
+Golden (GCI-curated)       617  0.5005±0.0166  0.4161±0.0137  0.7009±0.0218  0.6750±0.0294
+
+──────────────────────────────────────────────────────────────────────────────────────────────
+Best mean MAE: Original (100%) (0.4000 ± 0.0157)
