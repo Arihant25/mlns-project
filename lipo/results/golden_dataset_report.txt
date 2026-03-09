@@ -1,0 +1,14 @@
+Golden Dataset Curation Report
+==============================
+Ensemble seeds : [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+Total training : 2940
+
+GCI statistics:
+  mean = 0.047109
+  std  = 0.049662
+  τ    = mean + 3σ = 0.196096
+
+Molecules kept    : 2892  (98.4%)
+Molecules removed : 48  (1.6%)
+
+Saved: train_embeddings_golden.pt, train_targets_golden.pt
