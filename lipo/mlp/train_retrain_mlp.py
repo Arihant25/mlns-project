@@ -38,8 +38,7 @@ SUFFIXES = ["", "_curated_05", "_curated_10", "_curated_15"]
 LABELS   = ["100 % (original)", "95 % (−5 %)", "90 % (−10 %)", "85 % (−15 %)"]
 
 # Reproducibility seeds
-SEEDS = [0, 1, 2, 3, 4]
-
+SEEDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def set_seed(seed: int):
