@@ -8,34 +8,30 @@ Usage:
     python train_gsl.py
 """
 
-import os
 import copy
+import os
+
 import numpy as np
 import torch
-from torch import nn
-from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
-from scipy.stats import pearsonr, spearmanr
-
+from model_gsl import SimpleGSLModel
 from rdkit import Chem
 from rdkit.Chem import AllChem, DataStructs
-
-from tdc.single_pred import ADME
-
-from model_gsl import SimpleGSLModel
-
+from scipy.stats import pearsonr, spearmanr
+from sklearn.preprocessing import StandardScaler
+from torch import nn
+from torch.utils.data import DataLoader, Dataset
 
 # ── Configuration ────────────────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-DATA_DIR     = os.path.join(PROJECT_ROOT, "data")
-RESULTS_DIR  = os.path.join(PROJECT_ROOT, "results")
-DEVICE       = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
+RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-BATCH_SIZE   = 128
-LR           = 1e-3
-MAX_EPOCHS   = 100
-PATIENCE     = 10        # early-stopping patience
-LR_PATIENCE  = 5         # ReduceLROnPlateau patience
+BATCH_SIZE = 128
+LR = 1e-3
+MAX_EPOCHS = 100
+PATIENCE = 10  # early-stopping patience
+LR_PATIENCE = 5  # ReduceLROnPlateau patience
 
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
@@ -45,10 +41,9 @@ class GSLDataset(Dataset):
     string (needed by the custom collate function for ECFP computation).
     """
 
-    def __init__(self,
-                 embeddings: torch.Tensor,
-                 targets: torch.Tensor,
-                 smiles: list[str]):
+    def __init__(
+        self, embeddings: torch.Tensor, targets: torch.Tensor, smiles: list[str]
+    ):
         assert embeddings.shape[0] == targets.shape[0] == len(smiles)
         self.embeddings = embeddings
         self.targets = targets
@@ -87,7 +82,7 @@ def _compute_ecfp_tanimoto(smiles_list: list[str]) -> torch.Tensor:
     A = torch.zeros(n, n)
     for i in range(n):
         # BulkTanimotoSimilarity is vectorised in C++ — much faster than loop
-        sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[i + 1:])
+        sims = DataStructs.BulkTanimotoSimilarity(fps[i], fps[i + 1 :])
         for j, s in enumerate(sims, start=i + 1):
             A[i, j] = s
             A[j, i] = s
@@ -115,24 +110,19 @@ def gsl_collate_fn(batch):
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def load_tensors(split: str):
     """Load pre-computed embedding and target tensors."""
-    emb = torch.load(os.path.join(DATA_DIR, f"{split}_embeddings.pt"),
-                     weights_only=True)
-    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"),
-                     weights_only=True)
+    emb = torch.load(
+        os.path.join(DATA_DIR, f"{split}_embeddings.pt"), weights_only=True
+    )
+    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"), weights_only=True)
     return emb, tgt
 
 
 def load_smiles() -> dict[str, list[str]]:
-    """
-    Reload SMILES from the cached TDC dataset and return the same scaffold
-    split used during embedding generation.
-    """
-    data = ADME(name="Lipophilicity_AstraZeneca")
-    split = data.get_split(method="scaffold")
+    """Load split SMILES cached by generate_embeddings.py from DATA_DIR."""
     return {
-        "train": split["train"]["Drug"].tolist(),
-        "val":   split["valid"]["Drug"].tolist(),
-        "test":  split["test"]["Drug"].tolist(),
+        "train": torch.load(os.path.join(DATA_DIR, "train_smiles.pt")),
+        "val": torch.load(os.path.join(DATA_DIR, "val_smiles.pt")),
+        "test": torch.load(os.path.join(DATA_DIR, "test_smiles.pt")),
     }
 
 
@@ -187,31 +177,37 @@ def main():
     # 1. Load embeddings, targets, and SMILES
     print("[1/5] Loading pre-computed embeddings and SMILES …")
     train_emb, train_tgt = load_tensors("train")
-    val_emb,   val_tgt   = load_tensors("val")
-    test_emb,  test_tgt  = load_tensors("test")
+    val_emb, val_tgt = load_tensors("val")
+    test_emb, test_tgt = load_tensors("test")
     smiles = load_smiles()
-    print(f"       Train: {train_emb.shape[0]}, Val: {val_emb.shape[0]}, "
-          f"Test: {test_emb.shape[0]}")
+    print(
+        f"       Train: {train_emb.shape[0]}, Val: {val_emb.shape[0]}, "
+        f"Test: {test_emb.shape[0]}"
+    )
 
     # 2. Fit scaler on training targets only
     print("[2/5] Fitting StandardScaler on training targets …")
     scaler = fit_scaler(train_tgt.numpy())
     train_tgt_s = scale_targets(train_tgt.numpy(), scaler)
-    val_tgt_s   = scale_targets(val_tgt.numpy(),   scaler)
-    test_tgt_s  = scale_targets(test_tgt.numpy(),  scaler)
+    val_tgt_s = scale_targets(val_tgt.numpy(), scaler)
+    test_tgt_s = scale_targets(test_tgt.numpy(), scaler)
 
     # 3. Build DataLoaders with custom collate
     train_loader = DataLoader(
         GSLDataset(train_emb, train_tgt_s, smiles["train"]),
-        batch_size=BATCH_SIZE, shuffle=True, collate_fn=gsl_collate_fn,
+        batch_size=BATCH_SIZE,
+        shuffle=True,
+        collate_fn=gsl_collate_fn,
     )
     val_loader = DataLoader(
         GSLDataset(val_emb, val_tgt_s, smiles["val"]),
-        batch_size=BATCH_SIZE, collate_fn=gsl_collate_fn,
+        batch_size=BATCH_SIZE,
+        collate_fn=gsl_collate_fn,
     )
     test_loader = DataLoader(
         GSLDataset(test_emb, test_tgt_s, smiles["test"]),
-        batch_size=BATCH_SIZE, collate_fn=gsl_collate_fn,
+        batch_size=BATCH_SIZE,
+        collate_fn=gsl_collate_fn,
     )
 
     # 4. Initialise model, optimiser, scheduler, loss
@@ -232,14 +228,16 @@ def main():
 
     for epoch in range(1, MAX_EPOCHS + 1):
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer)
-        val_loss   = evaluate(model, val_loader, criterion)
+        val_loss = evaluate(model, val_loader, criterion)
         scheduler.step(val_loss)
 
         lr = optimizer.param_groups[0]["lr"]
-        print(f"  Epoch {epoch:3d}/{MAX_EPOCHS}  |  "
-              f"Train Loss: {train_loss:.6f}  |  "
-              f"Val Loss: {val_loss:.6f}  |  "
-              f"LR: {lr:.2e}")
+        print(
+            f"  Epoch {epoch:3d}/{MAX_EPOCHS}  |  "
+            f"Train Loss: {train_loss:.6f}  |  "
+            f"Val Loss: {val_loss:.6f}  |  "
+            f"LR: {lr:.2e}"
+        )
 
         if val_loss < best_val_loss:
             best_val_loss = val_loss
@@ -270,17 +268,17 @@ def main():
             all_preds.append(preds)
             all_targets.append(y.numpy())
 
-    preds_scaled   = np.concatenate(all_preds)
+    preds_scaled = np.concatenate(all_preds)
     targets_scaled = np.concatenate(all_targets)
 
     # Inverse-transform to original scale
-    preds_orig   = scaler.inverse_transform(preds_scaled.reshape(-1, 1)).flatten()
+    preds_orig = scaler.inverse_transform(preds_scaled.reshape(-1, 1)).flatten()
     targets_orig = scaler.inverse_transform(targets_scaled.reshape(-1, 1)).flatten()
 
     # Compute metrics
-    rmse     = float(np.sqrt(np.mean((preds_orig - targets_orig) ** 2)))
-    mae      = float(np.mean(np.abs(preds_orig - targets_orig)))
-    pearson  = float(pearsonr(preds_orig, targets_orig)[0])
+    rmse = float(np.sqrt(np.mean((preds_orig - targets_orig) ** 2)))
+    mae = float(np.mean(np.abs(preds_orig - targets_orig)))
+    pearson = float(pearsonr(preds_orig, targets_orig)[0])
     spearman_r = float(spearmanr(preds_orig, targets_orig)[0])
 
     metrics_text = (
