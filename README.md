@@ -63,6 +63,10 @@ python curate_dataset.py
 cd ../mlp
 python train_retrain_mlp.py
 python train_weighted_mlp.py
+
+cd ../gsl
+python train_weighted_gsl.py
+python train_weighted_attentivefp.py
 ```
 
 ### 2.3 Golden dataset + comparisons
@@ -104,6 +108,10 @@ python curate_dataset.py
 cd ../mlp
 python train_retrain_mlp.py
 python train_weighted_mlp.py
+
+cd ../gsl
+python train_weighted_gsl.py
+python train_weighted_attentivefp.py
 ```
 
 ### 3.3 Golden dataset + comparisons

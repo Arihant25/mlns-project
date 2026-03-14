@@ -1,8 +1,8 @@
 Phase 1B — GSL Model Test Metrics
 ==================================
-RMSE              : 0.6221
-MAE               : 0.5045
-Pearson  (r)      : 0.5811
-Spearman (ρ)      : 0.6229
+RMSE              : 0.5567
+MAE               : 0.4519
+Pearson  (r)      : 0.6798
+Spearman (ρ)      : 0.5754
 
-Model weights     : /home/ineshshukla/dev/mlns/mlns-project/gsl/../results/gsl_model.pt
+Model weights     : C:\Users\Arihant\Git\mlns-project\caco\gsl\..\results\gsl_model.pt

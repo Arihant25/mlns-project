@@ -1,11 +1,11 @@
 Phase 2A — Evidential MLP Test Metrics
 =======================================
-RMSE                          : 0.5353
-MAE                           : 0.4376
-Pearson  (r)                  : 0.6920
-Spearman (ρ)                  : 0.6376
+RMSE                          : 0.4190
+MAE                           : 0.3399
+Pearson  (r)                  : 0.8059
+Spearman (ρ)                  : 0.7822
 
-Mean Aleatoric Uncertainty    : 0.1052
-Spearman(u, |error|)          : -0.1405
+Mean Aleatoric Uncertainty    : 0.0724
+Spearman(u, |error|)          : 0.0813
 
-Model weights                 : /home/ineshshukla/dev/mlns/mlns-project/mlp/../results/evidential_mlp.pt
+Model weights                 : C:\Users\Arihant\Git\mlns-project\caco\mlp\..\results\evidential_mlp.pt

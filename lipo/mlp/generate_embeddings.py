@@ -9,6 +9,7 @@ Usage:
 """
 
 import os
+import time
 
 import numpy as np
 import torch
@@ -20,6 +21,13 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "data"
 MODEL_NAME = "ibm/MoLFormer-XL-both-10pct"
 BATCH_SIZE = 32  # keeps peak RAM reasonable on CPU
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+
+def format_eta(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 # ── Helper: batched embedding extraction ─────────────────────────────────────
@@ -47,7 +55,10 @@ def generate_embeddings(
     """
     all_embeddings = []
 
-    for start in range(0, len(smiles_list), batch_size):
+    batch_times = []
+    total_batches = (len(smiles_list) + batch_size - 1) // batch_size
+    for batch_idx, start in enumerate(range(0, len(smiles_list), batch_size), start=1):
+        batch_start = time.perf_counter()
         batch = smiles_list[start : start + batch_size]
         inputs = tokenizer(
             batch,
@@ -68,9 +79,13 @@ def generate_embeddings(
         embeddings = masked_hidden.sum(dim=1) / attention_mask.sum(dim=1)
 
         all_embeddings.append(embeddings.cpu())
+        batch_times.append(time.perf_counter() - batch_start)
+        avg_batch_s = sum(batch_times) / len(batch_times)
+        eta_s = avg_batch_s * (total_batches - batch_idx)
         print(
             f"  Processed {min(start + batch_size, len(smiles_list)):>5d}"
             f" / {len(smiles_list)} molecules"
+            f"  |  ETA: {format_eta(eta_s)}"
         )
 
     return torch.cat(all_embeddings, dim=0)

@@ -4,11 +4,11 @@ Ensemble seeds : [0, 1, 2, 3, 4]
 Total training : 637
 
 GCI statistics:
-  mean = 0.097340
-  std  = 0.097590
-  τ    = mean + 3σ = 0.390110
+  mean = 0.079444
+  std  = 0.083752
+  τ    = mean + 3σ = 0.330702
 
-Molecules kept    : 617  (96.9%)
-Molecules removed : 20  (3.1%)
+Molecules kept    : 620  (97.3%)
+Molecules removed : 17  (2.7%)
 
 Saved: train_embeddings_golden.pt, train_targets_golden.pt

@@ -239,10 +239,11 @@ def main():
     print(f"\n{report}")
 
     report_path = os.path.join(RESULTS_DIR, "golden_mlp_report.txt")
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write(report + "\n")
     print(f"\nReport saved → {report_path}")
 
 
 if __name__ == "__main__":
     main()
+

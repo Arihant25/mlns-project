@@ -15,44 +15,45 @@ Usage:
     python train_weighted_mlp.py
 """
 
-import os
-import sys
-import random
 import copy
+import os
+import random
+import sys
+import time
+
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
-from sklearn.preprocessing import StandardScaler
 from scipy.stats import pearsonr, spearmanr
+from sklearn.preprocessing import StandardScaler
+from torch.utils.data import DataLoader, Dataset
 
 # ── Cross-directory imports ──────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 GSL_DIR = os.path.join(PROJECT_ROOT, "gsl")
 sys.path.insert(0, GSL_DIR)
 
-from model import BaselineMLP                               # noqa: E402
-from model_evidential_gsl import EvidentialGSLModel          # noqa: E402
-from train_gsl import (                                      # noqa: E402
+from model import BaselineMLP  # noqa: E402
+from model_evidential_gsl import EvidentialGSLModel  # noqa: E402
+from train_gsl import (  # noqa: E402
     GSLDataset,
     gsl_collate_fn,
     load_smiles,
 )
 
-
 # ── Configuration ────────────────────────────────────────────────────────────
-DATA_DIR    = os.path.join(PROJECT_ROOT, "data")
+DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
-MODEL_PATH  = os.path.join(RESULTS_DIR, "evidential_gsl.pt")
-DEVICE      = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+MODEL_PATH = os.path.join(RESULTS_DIR, "evidential_gsl.pt")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-BATCH_SIZE   = 64
-LR           = 1e-3
-MAX_EPOCHS   = 100
-PATIENCE     = 10
-LR_PATIENCE  = 5
+BATCH_SIZE = 64
+LR = 1e-3
+MAX_EPOCHS = 100
+PATIENCE = 10
+LR_PATIENCE = 5
 
 GAMMAS = [0.0, 0.1, 0.5, 1.0, 2.0, 5.0]
-SEEDS  = [42, 123, 456, 789, 1024]
+SEEDS = [42, 123, 456, 789, 1024]
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
@@ -66,10 +67,10 @@ def set_seed(seed: int):
 
 
 def load_tensors(split: str):
-    emb = torch.load(os.path.join(DATA_DIR, f"{split}_embeddings.pt"),
-                     weights_only=True)
-    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"),
-                     weights_only=True)
+    emb = torch.load(
+        os.path.join(DATA_DIR, f"{split}_embeddings.pt"), weights_only=True
+    )
+    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"), weights_only=True)
     return emb, tgt
 
 
@@ -84,6 +85,13 @@ def scale(targets: np.ndarray, scaler: StandardScaler) -> torch.Tensor:
         scaler.transform(targets.reshape(-1, 1)).flatten(),
         dtype=torch.float32,
     )
+
+
+def format_eta(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
 
 
 # ── Weighted Dataset ─────────────────────────────────────────────────────────
@@ -118,7 +126,9 @@ def extract_uncertainties(train_emb, train_tgt_s, train_smiles):
     n = train_emb.shape[0]
     loader = DataLoader(
         GSLDataset(train_emb, train_tgt_s, train_smiles),
-        batch_size=n, shuffle=False, collate_fn=gsl_collate_fn,
+        batch_size=n,
+        shuffle=False,
+        collate_fn=gsl_collate_fn,
     )
 
     with torch.no_grad():
@@ -127,8 +137,7 @@ def extract_uncertainties(train_emb, train_tgt_s, train_smiles):
             _, (mu, v, alpha, beta) = model(X, A_ecfp)
 
     u = (beta / (alpha - 1.0)).detach().cpu()
-    print(f"  Uncertainty: min={u.min():.4f}, max={u.max():.4f}, "
-          f"mean={u.mean():.4f}")
+    print(f"  Uncertainty: min={u.min():.4f}, max={u.max():.4f}, mean={u.mean():.4f}")
     return u
 
 
@@ -179,9 +188,9 @@ def test_metrics(model, loader, scaler):
     t = scaler.inverse_transform(np.concatenate(tgts_all).reshape(-1, 1)).flatten()
 
     rmse = float(np.sqrt(np.mean((p - t) ** 2)))
-    mae  = float(np.mean(np.abs(p - t)))
-    r    = float(pearsonr(p, t)[0])
-    rho  = float(spearmanr(p, t)[0])
+    mae = float(np.mean(np.abs(p - t)))
+    r = float(pearsonr(p, t)[0])
+    rho = float(spearmanr(p, t)[0])
     return rmse, mae, r, rho
 
 
@@ -189,8 +198,8 @@ def run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler):
     set_seed(seed)
 
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
-    val_loader   = DataLoader(val_ds,   batch_size=BATCH_SIZE)
-    test_loader  = DataLoader(test_ds,  batch_size=BATCH_SIZE)
+    val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE)
+    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE)
 
     model = BaselineMLP().to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
@@ -199,10 +208,20 @@ def run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler):
     )
 
     best_val, best_state, no_improve = float("inf"), None, 0
+    epoch_times = []
     for epoch in range(1, MAX_EPOCHS + 1):
+        epoch_start = time.perf_counter()
         train_one_epoch_weighted(model, train_loader, optimizer, gamma)
         v_loss = evaluate_mse(model, val_loader)
         scheduler.step(v_loss)
+
+        epoch_times.append(time.perf_counter() - epoch_start)
+        avg_epoch_s = sum(epoch_times) / len(epoch_times)
+        eta_s = avg_epoch_s * (MAX_EPOCHS - epoch)
+        print(
+            f"      [seed={seed}] epoch {epoch:3d}/{MAX_EPOCHS}  "
+            f"val={v_loss:.6f}  ETA: {format_eta(eta_s)}"
+        )
 
         if v_loss < best_val:
             best_val = v_loss
@@ -224,67 +243,84 @@ def main():
     # 1. Load data
     print("[1/3] Loading data …")
     train_emb, train_tgt = load_tensors("train")
-    val_emb,   val_tgt   = load_tensors("val")
-    test_emb,  test_tgt  = load_tensors("test")
+    val_emb, val_tgt = load_tensors("val")
+    test_emb, test_tgt = load_tensors("test")
     smiles = load_smiles()
 
     scaler = fit_scaler(train_tgt.numpy())
     train_tgt_s = scale(train_tgt.numpy(), scaler)
-    val_tgt_s   = scale(val_tgt.numpy(),   scaler)
-    test_tgt_s  = scale(test_tgt.numpy(),  scaler)
+    val_tgt_s = scale(val_tgt.numpy(), scaler)
+    test_tgt_s = scale(test_tgt.numpy(), scaler)
 
     # 2. Extract per-molecule uncertainty via Evidential GSL
     print("[2/3] Extracting training-set uncertainties …")
     u_train = extract_uncertainties(train_emb, train_tgt_s, smiles["train"])
-    u_dummy_val  = torch.zeros(val_emb.shape[0])
+    u_dummy_val = torch.zeros(val_emb.shape[0])
     u_dummy_test = torch.zeros(test_emb.shape[0])
 
     train_ds = WeightedDataset(train_emb, train_tgt_s, u_train)
-    val_ds   = WeightedDataset(val_emb,   val_tgt_s,   u_dummy_val)
-    test_ds  = WeightedDataset(test_emb,  test_tgt_s,  u_dummy_test)
+    val_ds = WeightedDataset(val_emb, val_tgt_s, u_dummy_val)
+    test_ds = WeightedDataset(test_emb, test_tgt_s, u_dummy_test)
 
     # 3. Sweep gammas × seeds
     print(f"[3/3] Training sweep: {len(GAMMAS)} γ × {len(SEEDS)} seeds …\n")
     results = []
+    total_runs = len(GAMMAS) * len(SEEDS)
+    completed_runs = 0
+    sweep_start = time.perf_counter()
     for gamma in GAMMAS:
         print(f"  ── γ = {gamma} ──")
         seed_metrics = []
         for seed in SEEDS:
             m = run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler)
-            print(f"    seed={seed:>4d}  RMSE={m[0]:.4f}  MAE={m[1]:.4f}  "
-                  f"r={m[2]:.4f}  ρ={m[3]:.4f}")
+            print(
+                f"    seed={seed:>4d}  RMSE={m[0]:.4f}  MAE={m[1]:.4f}  "
+                f"r={m[2]:.4f}  ρ={m[3]:.4f}"
+            )
             seed_metrics.append(m)
+            completed_runs += 1
+            avg_run_s = (time.perf_counter() - sweep_start) / completed_runs
+            eta_s = avg_run_s * (total_runs - completed_runs)
+            print(f"      [sweep ETA] remaining: {format_eta(eta_s)}")
 
         arr = np.array(seed_metrics)
         means = arr.mean(axis=0)
-        stds  = arr.std(axis=0)
-        print(f"    → mean  RMSE={means[0]:.4f}±{stds[0]:.4f}  "
-              f"MAE={means[1]:.4f}±{stds[1]:.4f}  "
-              f"r={means[2]:.4f}±{stds[2]:.4f}  "
-              f"ρ={means[3]:.4f}±{stds[3]:.4f}\n")
+        stds = arr.std(axis=0)
+        print(
+            f"    → mean  RMSE={means[0]:.4f}±{stds[0]:.4f}  "
+            f"MAE={means[1]:.4f}±{stds[1]:.4f}  "
+            f"r={means[2]:.4f}±{stds[2]:.4f}  "
+            f"ρ={means[3]:.4f}±{stds[3]:.4f}\n"
+        )
 
-        results.append({
-            "gamma": gamma,
-            "rmse_mean": means[0], "rmse_std": stds[0],
-            "mae_mean":  means[1], "mae_std":  stds[1],
-            "r_mean":    means[2], "r_std":    stds[2],
-            "rho_mean":  means[3], "rho_std":  stds[3],
-        })
+        results.append(
+            {
+                "gamma": gamma,
+                "rmse_mean": means[0],
+                "rmse_std": stds[0],
+                "mae_mean": means[1],
+                "mae_std": stds[1],
+                "r_mean": means[2],
+                "r_std": stds[2],
+                "rho_mean": means[3],
+                "rho_std": stds[3],
+            }
+        )
 
     # ── Summary report ───────────────────────────────────────────────────────
     seeds_str = ", ".join(str(s) for s in SEEDS)
     header = (
-        f"{'γ':>5s}  {'RMSE':>14s}  {'MAE':>14s}  "
-        f"{'Pearson':>14s}  {'Spearman':>14s}"
+        f"{'γ':>5s}  {'RMSE':>14s}  {'MAE':>14s}  {'Pearson':>14s}  {'Spearman':>14s}"
     )
     sep = "─" * len(header)
     lines = [
         "Phase 3C — Soft-Weighting Report (Multi-Seed)",
         "===============================================",
         f"Seeds: [{seeds_str}]  ({len(SEEDS)} runs per γ)",
-        f"Training set: 637 molecules (full, no removal)",
+        "Training set: 637 molecules (full, no removal)",
         "",
-        header, sep,
+        header,
+        sep,
     ]
     for r in results:
         lines.append(
@@ -306,10 +342,11 @@ def main():
     print(f"\n{report}")
 
     report_path = os.path.join(RESULTS_DIR, "phase3c_soft_weighting_report.txt")
-    with open(report_path, "w") as f:
+    with open(report_path, "w", encoding="utf-8") as f:
         f.write(report + "\n")
     print(f"\nReport saved → {report_path}")
 
 
 if __name__ == "__main__":
     main()
+

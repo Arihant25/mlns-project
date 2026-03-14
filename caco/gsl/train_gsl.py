@@ -10,11 +10,12 @@ Usage:
 
 import copy
 import os
+import time
 
 import numpy as np
 import torch
 from model_gsl import SimpleGSLModel
-from rdkit import Chem
+from rdkit import Chem, RDLogger
 from rdkit.Chem import AllChem, DataStructs
 from scipy.stats import pearsonr, spearmanr
 from sklearn.preprocessing import StandardScaler
@@ -32,6 +33,9 @@ LR = 1e-3
 MAX_EPOCHS = 100
 PATIENCE = 10  # early-stopping patience
 LR_PATIENCE = 5  # ReduceLROnPlateau patience
+
+# Silence verbose RDKit deprecation chatter during fingerprint construction.
+RDLogger.DisableLog("rdApp.warning")
 
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
@@ -137,6 +141,13 @@ def scale_targets(targets: np.ndarray, scaler: StandardScaler) -> torch.Tensor:
     return torch.tensor(scaled, dtype=torch.float32)
 
 
+def format_eta(seconds: float) -> str:
+    seconds = max(0, int(seconds))
+    h, rem = divmod(seconds, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
 # ── Training / Evaluation ───────────────────────────────────────────────────
 def train_one_epoch(model, loader, criterion, optimizer):
     model.train()
@@ -225,18 +236,25 @@ def main():
     best_val_loss = float("inf")
     best_state = None
     epochs_no_improve = 0
+    epoch_times = []
 
     for epoch in range(1, MAX_EPOCHS + 1):
+        epoch_start = time.perf_counter()
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer)
         val_loss = evaluate(model, val_loader, criterion)
         scheduler.step(val_loss)
+
+        epoch_times.append(time.perf_counter() - epoch_start)
+        avg_epoch_s = sum(epoch_times) / len(epoch_times)
+        eta_s = avg_epoch_s * (MAX_EPOCHS - epoch)
 
         lr = optimizer.param_groups[0]["lr"]
         print(
             f"  Epoch {epoch:3d}/{MAX_EPOCHS}  |  "
             f"Train Loss: {train_loss:.6f}  |  "
             f"Val Loss: {val_loss:.6f}  |  "
-            f"LR: {lr:.2e}"
+            f"LR: {lr:.2e}  |  "
+            f"ETA: {format_eta(eta_s)}"
         )
 
         if val_loss < best_val_loss:
@@ -293,10 +311,11 @@ def main():
     print("\n" + metrics_text)
 
     metrics_path = os.path.join(RESULTS_DIR, "phase1b_metrics.txt")
-    with open(metrics_path, "w") as f:
+    with open(metrics_path, "w", encoding="utf-8") as f:
         f.write(metrics_text)
     print(f"Metrics saved → {metrics_path}")
 
 
 if __name__ == "__main__":
     main()
+
