@@ -1,7 +1,7 @@
 # Aleatoric Graph Structure Learning for Automated Dataset Curation in ADMET Prediction
 
 **Inesh Shukla\*** 1  
-**Arihant Tripathi\*** 1  
+**Arihant Tripathy\*** 1  
 
 ## Abstract
 
