@@ -1,0 +1,13 @@
+MiniMol + Our Architecture — Evidential GSL Test Metrics (AqSolDB)
+=====================================================================
+Model: MiniMol (512-d) → EvidentialGSLModel(embed_dim=512)
+
+RMSE                          : 1.0383
+MAE                           : 0.7359
+Pearson  (r)                  : 0.8936
+Spearman (ρ)                  : 0.8699
+
+Mean Aleatoric Uncertainty    : 0.2182
+Spearman(u, |error|)          : 0.1473
+
+Model weights                 : C:\Users\Arihant\Git\mlns-project\aqsol\minimol\..\results\evidential_gsl_minimol.pt

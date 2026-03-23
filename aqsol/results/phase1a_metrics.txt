@@ -1,0 +1,8 @@
+Phase 1A — Baseline MLP Test Metrics
+=====================================
+RMSE              : 1.1828
+MAE               : 0.8883
+Pearson  (r)      : 0.8595
+Spearman (ρ)      : 0.8438
+
+Model weights     : C:\Users\Arihant\Git\mlns-project\aqsol\mlp\..\results\baseline_mlp.pt

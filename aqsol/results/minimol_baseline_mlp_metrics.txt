@@ -1,0 +1,11 @@
+MiniMol As-Is Baseline — MLP Test Metrics (AqSolDB)
+=====================================================
+Model: MiniMol (512-d) → 512→256→128→1 MLP
+TDC Rank-1 reference MAE: 0.741 ± 0.013
+
+RMSE              : 1.0588
+MAE               : 0.7658
+Pearson  (r)      : 0.8888
+Spearman (ρ)      : 0.8685
+
+Model weights     : C:\Users\Arihant\Git\mlns-project\aqsol\minimol\..\results\minimol_baseline_mlp.pt

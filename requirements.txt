@@ -6,3 +6,6 @@ scipy
 requests
 rdkit
 xgboost
+minimol
+chemprop
+setuptools<71
