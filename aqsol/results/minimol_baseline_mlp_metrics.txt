@@ -1,11 +1,17 @@
-MiniMol As-Is Baseline — MLP Test Metrics (AqSolDB)
-=====================================================
-Model: MiniMol (512-d) → 512→256→128→1 MLP
-TDC Rank-1 reference MAE: 0.741 ± 0.013
+MiniMol As-Is Baseline -- MLP Test Metrics (AqSolDB)
+=======================================================
+Model: MiniMol (512-d) -> 512->256->128->1 MLP
+Seeds: [1, 2, 3, 4, 5]
+TDC Rank-1 reference: MAE 0.741 +/- 0.013
 
-RMSE              : 1.0588
-MAE               : 0.7658
-Pearson  (r)      : 0.8888
-Spearman (ρ)      : 0.8685
+RMSE     : 1.0712 +/- 0.0069
+MAE      : 0.7762 +/- 0.0082
+Pearson  : 0.8869 +/- 0.0017
+Spearman : 0.8708 +/- 0.0019
 
-Model weights     : C:\Users\Arihant\Git\mlns-project\aqsol\minimol\..\results\minimol_baseline_mlp.pt
+Per-seed results:
+  seed=1  RMSE=1.0737  MAE=0.7732  r=0.8873  rho=0.8721
+  seed=2  RMSE=1.0577  MAE=0.7671  r=0.8899  rho=0.8678
+  seed=3  RMSE=1.0744  MAE=0.7753  r=0.8859  rho=0.8731
+  seed=4  RMSE=1.0729  MAE=0.7736  r=0.8867  rho=0.8714
+  seed=5  RMSE=1.0773  MAE=0.7917  r=0.8850  rho=0.8695

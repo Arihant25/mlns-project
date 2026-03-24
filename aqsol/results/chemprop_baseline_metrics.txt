@@ -1,0 +1,10 @@
+Chemprop-RDKit Baseline -- AqSolDB Test Metrics
+==================================================
+Model: Chemprop MPNN + v1_rdkit_2d_normalized (= Chemprop-RDKit)
+Seeds: [1, 2, 3, 4, 5]
+TDC Rank-2 reference: MAE 0.761 +/- 0.025
+
+Results saved in: C:\Users\Arihant\Git\mlns-project\aqsol\chemprop\..\results\chemprop_baseline
+Check test_scores.json in each seed subdirectory.
+
+Results directory: C:\Users\Arihant\Git\mlns-project\aqsol\chemprop\..\results\chemprop_baseline

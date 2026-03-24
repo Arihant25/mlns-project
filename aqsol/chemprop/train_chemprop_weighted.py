@@ -22,6 +22,11 @@ Prerequisites:
 import glob
 import json
 import os
+import re
+import sys
+from csv import DictReader
+
+import numpy as np
 
 # ── Configuration ────────────────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -33,6 +38,37 @@ TEST_CSV = os.path.join(DATA_DIR, "chemprop_test.csv")
 
 GAMMAS = [0.0, 7.0, 10.0, 12.5, 15.0, 20.0]
 
+_STANDALONE_H_PATTERN = re.compile(r"(^|\.)\[H[+-]?\](\.|$)")
+
+
+def _count_standalone_h_fragments(csv_path: str) -> tuple[int, int]:
+    """Count rows that contain standalone [H]/[H+]/[H-] fragments."""
+    total = 0
+    flagged = 0
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in DictReader(f):
+            total += 1
+            smiles = row.get("smiles", "")
+            if _STANDALONE_H_PATTERN.search(smiles):
+                flagged += 1
+    return flagged, total
+
+
+def _print_rdkit_warning_context_once(
+    train_csv: str, val_csv: str, test_csv: str
+) -> None:
+    """Print one concise note explaining expected RDKit hydrogen warnings."""
+    stats = []
+    for label, path in (("train", train_csv), ("val", val_csv), ("test", test_csv)):
+        flagged, total = _count_standalone_h_fragments(path)
+        stats.append(f"{label}={flagged}/{total}")
+
+    print(
+        "Note: RDKit warnings like 'not removing hydrogen atom without neighbors' "
+        "are expected for some salt/counterion SMILES with standalone hydrogen "
+        f"fragments. Affected rows: {', '.join(stats)}."
+    )
+
 
 def run_chemprop_for_gamma(gamma: float) -> dict:
     """Train Chemprop with soft weights for one gamma value."""
@@ -43,8 +79,6 @@ def run_chemprop_for_gamma(gamma: float) -> dict:
         raise FileNotFoundError(
             f"Missing {train_csv}. Run export_sample_weights.py first."
         )
-
-    from chemprop.cli.train import TrainSubcommand
 
     args = [
         "-i",
@@ -70,18 +104,29 @@ def run_chemprop_for_gamma(gamma: float) -> dict:
     ]
 
     print(f"  gamma={gamma}  train_csv={train_csv}")
-    subcommand = TrainSubcommand()
-    parser = subcommand.parser
-    train_args = parser.parse_args(args)
-    subcommand.func(train_args)
+    from chemprop.cli.main import main as chemprop_main
 
-    result_files = glob.glob(
-        os.path.join(save_dir, "**", "test_scores.json"), recursive=True
+    sys.argv = ["chemprop", "train"] + args
+    chemprop_main()
+
+    pred_files = glob.glob(
+        os.path.join(save_dir, "**", "test_predictions.csv"), recursive=True
     )
-    if result_files:
-        with open(result_files[0]) as f:
-            return json.load(f)
-    return {}
+    if not pred_files:
+        return {}
+
+    preds_df = __import__("pandas").read_csv(pred_files[0])
+    truth_df = __import__("pandas").read_csv(TEST_CSV)
+    merged = preds_df[["smiles", "y"]].merge(
+        truth_df[["smiles", "y"]].rename(columns={"y": "y_true"}),
+        on="smiles",
+    )
+    y_pred = merged["y"].to_numpy()
+    y_true = merged["y_true"].to_numpy()
+    mse = float(np.mean((y_pred - y_true) ** 2))
+    rmse = float(np.sqrt(mse))
+    mae = float(np.mean(np.abs(y_pred - y_true)))
+    return {"mse": mse, "rmse": rmse, "mae": mae}
 
 
 def main():
@@ -96,11 +141,16 @@ def main():
     import chemprop
 
     print(f"Chemprop version: {chemprop.__version__}")
+    _print_rdkit_warning_context_once(
+        train_csv=os.path.join(DATA_DIR, f"chemprop_train_gamma_{GAMMAS[0]}.csv"),
+        val_csv=VAL_CSV,
+        test_csv=TEST_CSV,
+    )
     print(f"Sweeping {len(GAMMAS)} gamma values: {GAMMAS}\n")
 
     results = []
     for gamma in GAMMAS:
-        print(f"\n── gamma={gamma} ──────────────────────────────────────────")
+        print(f"\n-- gamma={gamma} ------------------------------------------")
         scores = run_chemprop_for_gamma(gamma)
         results.append({"gamma": gamma, "scores": scores})
         print(f"  Scores: {scores}")
@@ -140,7 +190,7 @@ def main():
     report_path = os.path.join(RESULTS_DIR, "chemprop_weighted_report.txt")
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report + "\n")
-    print(f"\nReport saved → {report_path}")
+    print(f"\nReport saved -> {report_path}")
 
 
 if __name__ == "__main__":

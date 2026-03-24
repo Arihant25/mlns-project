@@ -2,7 +2,7 @@
 export_sample_weights.py
 ========================
 Export per-sample soft weights for Chemprop training using aleatoric
-uncertainty from the trained MolFormer-based EvidentialGSLModel.
+uncertainty from the trained MiniMol EvidentialGSLModel (512-d).
 
 For each gamma in GAMMAS:
     w_i = exp(-gamma * u_i)
@@ -11,17 +11,17 @@ Writes the weight as an additional column in the training CSV so that
 Chemprop v2's -w / --weight-column flag can reference it.
 
 Outputs (one per gamma):
-    data/chemprop_train_gamma_{gamma}.csv  — train CSV with 'weight' column added
+    data/chemprop_train_gamma_{gamma}.csv  -- train CSV with 'weight' column added
 
 Also saves:
-    data/train_uncertainties.pt  — raw u_i tensor for reuse
+    data/train_uncertainties.pt  -- raw u_i tensor for reuse
 
 Usage:
     python export_sample_weights.py
 
 Prerequisites:
-    Run aqsol/gsl/train_evidential_gsl.py  → results/evidential_gsl.pt
-    Run export_chemprop_data.py            → data/chemprop_train.csv
+    Run minimol/train_minimol_evidential_gsl.py  -> results/evidential_gsl_minimol.pt
+    Run export_chemprop_data.py                  -> data/chemprop_train.csv
 """
 
 import os
@@ -37,16 +37,17 @@ PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 GSL_DIR = os.path.join(PROJECT_ROOT, "gsl")
 sys.path.insert(0, GSL_DIR)
 
+from gsl_utils import GSLDataset, gsl_collate_fn  # noqa: E402
 from model_evidential_gsl import EvidentialGSLModel  # noqa: E402
-from train_gsl import GSLDataset, gsl_collate_fn  # noqa: E402
 
 # ── Configuration ────────────────────────────────────────────────────────────
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
-MODEL_PATH = os.path.join(RESULTS_DIR, "evidential_gsl.pt")  # MolFormer 768-d model
+MODEL_PATH = os.path.join(RESULTS_DIR, "evidential_gsl_minimol.pt")  # MiniMol 512-d model
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 GAMMAS = [0.0, 7.0, 10.0, 12.5, 15.0, 20.0]
+EMBED_DIM = 512  # MiniMol output dimension
 
 
 def main():
@@ -54,13 +55,13 @@ def main():
 
     if not os.path.exists(MODEL_PATH):
         raise FileNotFoundError(
-            f"Missing {MODEL_PATH}. Run aqsol/gsl/train_evidential_gsl.py first."
+            f"Missing {MODEL_PATH}. Run minimol/train_minimol_evidential_gsl.py first."
         )
 
-    # 1. Load training embeddings and SMILES (MolFormer 768-d)
-    print("[1/3] Loading MolFormer training embeddings and SMILES …")
+    # 1. Load training embeddings and SMILES (MiniMol 512-d)
+    print("[1/3] Loading MiniMol training embeddings and SMILES ...")
     train_emb = torch.load(
-        os.path.join(DATA_DIR, "train_embeddings.pt"), weights_only=True
+        os.path.join(DATA_DIR, "train_embeddings_minimol.pt"), weights_only=True
     )
     train_tgt = torch.load(
         os.path.join(DATA_DIR, "train_targets.pt"), weights_only=True
@@ -68,7 +69,7 @@ def main():
     train_smiles = torch.load(os.path.join(DATA_DIR, "train_smiles.pt"))
     print(f"       Train: {train_emb.shape[0]} molecules, embed_dim={train_emb.shape[1]}")
 
-    # Scale targets (same as during training — fit on train only)
+    # Scale targets (same as during training -- fit on train only)
     from sklearn.preprocessing import StandardScaler
     scaler = StandardScaler()
     train_tgt_s = torch.tensor(
@@ -77,8 +78,8 @@ def main():
     )
 
     # 2. Run EvidentialGSLModel inference to get u_i
-    print("[2/3] Running EvidentialGSLModel inference …")
-    model = EvidentialGSLModel()  # default embed_dim=768
+    print("[2/3] Running EvidentialGSLModel(512-d) inference ...")
+    model = EvidentialGSLModel(embed_dim=EMBED_DIM)
     state = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
     model.load_state_dict(state)
     model.to(DEVICE)
@@ -103,10 +104,10 @@ def main():
     # Save raw uncertainties for reuse
     u_path = os.path.join(DATA_DIR, "train_uncertainties.pt")
     torch.save(u, u_path)
-    print(f"       Saved uncertainties → {u_path}")
+    print(f"       Saved uncertainties -> {u_path}")
 
     # 3. Load base training CSV and embed weight column per gamma
-    print(f"[3/3] Writing weighted training CSVs for {len(GAMMAS)} gamma values …")
+    print(f"[3/3] Writing weighted training CSVs for {len(GAMMAS)} gamma values ...")
     chemprop_train_path = os.path.join(DATA_DIR, "chemprop_train.csv")
     if not os.path.exists(chemprop_train_path):
         raise FileNotFoundError(
@@ -130,10 +131,10 @@ def main():
         df_w.to_csv(out_path, index=False)
         print(
             f"       gamma={gamma:5.1f}  weight range [{weights.min():.4f}, "
-            f"{weights.max():.4f}]  → {out_path}"
+            f"{weights.max():.4f}]  -> {out_path}"
         )
 
-    print("\nDone — weighted CSVs ready for train_chemprop_weighted.py")
+    print("\nDone -- weighted CSVs ready for train_chemprop_weighted.py")
 
 
 if __name__ == "__main__":
