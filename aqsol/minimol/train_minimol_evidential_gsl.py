@@ -4,12 +4,18 @@ train_minimol_evidential_gsl.py
 Train EvidentialGSLModel on 512-d MiniMol embeddings to obtain per-sample
 aleatoric uncertainty estimates used by the soft-weighting pipeline.
 
+Uses the TDC ADMET benchmark group protocol: seed=1 train/valid split for
+training, fixed benchmark test set for evaluation.
+
 Saves results/evidential_gsl_minimol.pt — consumed by:
     - train_minimol_weighted_mlp.py
     - chemprop/export_sample_weights.py
 
 Usage:
     python train_minimol_evidential_gsl.py
+
+Prerequisites:
+    python generate_embeddings_minimol.py
 """
 
 import copy
@@ -20,7 +26,9 @@ import time
 import numpy as np
 import torch
 from scipy.stats import pearsonr, spearmanr
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
+from tdc.benchmark_group import admet_group
 
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 GSL_DIR = os.path.join(PROJECT_ROOT, "gsl")
@@ -43,20 +51,8 @@ LOSS_COEFF = 0.1
 AUX_WEIGHT = 0.5
 EMBED_DIM = 512
 
-
-def load_tensors(split: str):
-    emb = torch.load(
-        os.path.join(DATA_DIR, f"{split}_embeddings_minimol.pt"), weights_only=True
-    )
-    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"), weights_only=True)
-    return emb, tgt
-
-
-def load_smiles():
-    return {
-        s: torch.load(os.path.join(DATA_DIR, f"{s}_smiles.pt"))
-        for s in ("train", "val", "test")
-    }
+# Uncertainty model trained on seed=1 split (internal; not directly benchmarked)
+UNCERTAINTY_SEED = 1
 
 
 def format_eta(seconds: float) -> str:
@@ -97,40 +93,67 @@ def evaluate(model, loader, criterion):
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    print("[1/5] Loading MiniMol embeddings and SMILES ...")
-    train_emb, train_tgt = load_tensors("train")
-    val_emb, val_tgt = load_tensors("val")
-    test_emb, test_tgt = load_tensors("test")
-    smiles = load_smiles()
+    print("[1/5] Loading TDC ADMET benchmark group ...")
+    group = admet_group(path=DATA_DIR)
+    benchmark = group.get("Solubility_AqSolDB")
+    name = benchmark["name"]
 
-    from sklearn.preprocessing import StandardScaler
+    print(f"[2/5] Loading MiniMol embeddings and getting seed={UNCERTAINTY_SEED} split ...")
+    all_tv_emb = torch.load(
+        os.path.join(DATA_DIR, "trainval_embeddings_minimol.pt"), weights_only=True
+    )
+    all_tv_tgt = torch.load(
+        os.path.join(DATA_DIR, "trainval_targets.pt"), weights_only=True
+    )
+    all_tv_smi = torch.load(os.path.join(DATA_DIR, "trainval_smiles.pt"))
+    test_emb = torch.load(
+        os.path.join(DATA_DIR, "test_embeddings_minimol.pt"), weights_only=True
+    )
+    test_tgt = torch.load(
+        os.path.join(DATA_DIR, "test_targets.pt"), weights_only=True
+    )
+
+    smi_to_idx = {s: i for i, s in enumerate(all_tv_smi)}
+
+    train_df, val_df = group.get_train_valid_split(
+        benchmark=name, split_type="default", seed=UNCERTAINTY_SEED
+    )
+    t_idx = [smi_to_idx[s] for s in train_df["Drug"].tolist()]
+    v_idx = [smi_to_idx[s] for s in val_df["Drug"].tolist()]
+
+    train_emb = all_tv_emb[t_idx]
+    val_emb = all_tv_emb[v_idx]
+    train_smi = train_df["Drug"].tolist()
+    val_smi = val_df["Drug"].tolist()
+    test_smi = torch.load(os.path.join(DATA_DIR, "test_smiles.pt"))
+
     scaler = StandardScaler()
-    scaler.fit(train_tgt.numpy().reshape(-1, 1))
+    scaler.fit(all_tv_tgt.numpy().reshape(-1, 1))
 
     def scale(t):
         return torch.tensor(
             scaler.transform(t.numpy().reshape(-1, 1)).flatten(), dtype=torch.float32
         )
 
-    train_tgt_s = scale(train_tgt)
-    val_tgt_s = scale(val_tgt)
+    train_tgt_s = scale(all_tv_tgt[t_idx])
+    val_tgt_s = scale(all_tv_tgt[v_idx])
     test_tgt_s = scale(test_tgt)
 
-    print("[2/5] Building data loaders ...")
+    print("[3/5] Building data loaders ...")
     train_loader = DataLoader(
-        GSLDataset(train_emb, train_tgt_s, smiles["train"]),
+        GSLDataset(train_emb, train_tgt_s, train_smi),
         batch_size=BATCH_SIZE, shuffle=True, collate_fn=gsl_collate_fn,
     )
     val_loader = DataLoader(
-        GSLDataset(val_emb, val_tgt_s, smiles["val"]),
+        GSLDataset(val_emb, val_tgt_s, val_smi),
         batch_size=BATCH_SIZE, collate_fn=gsl_collate_fn,
     )
     test_loader = DataLoader(
-        GSLDataset(test_emb, test_tgt_s, smiles["test"]),
+        GSLDataset(test_emb, test_tgt_s, test_smi),
         batch_size=BATCH_SIZE, collate_fn=gsl_collate_fn,
     )
 
-    print("[3/5] Initialising EvidentialGSLModel(embed_dim=512) ...")
+    print(f"[4/5] Initialising EvidentialGSLModel(embed_dim={EMBED_DIM}) ...")
     model = EvidentialGSLModel(embed_dim=EMBED_DIM).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
@@ -139,7 +162,7 @@ def main():
     criterion = ErrorScaledEvidentialLoss(coeff=LOSS_COEFF)
     print(f"       Parameters: {sum(p.numel() for p in model.parameters()):,}")
 
-    print("[4/5] Training ...")
+    print("[5/5] Training ...")
     best_val, best_state, no_improve = float("inf"), None, 0
     epoch_times = []
 
@@ -148,7 +171,6 @@ def main():
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer)
         val_loss = evaluate(model, val_loader, criterion)
         scheduler.step(val_loss)
-
         epoch_times.append(time.perf_counter() - t0)
         eta_s = (sum(epoch_times) / len(epoch_times)) * (MAX_EPOCHS - epoch)
         print(
@@ -172,7 +194,7 @@ def main():
     torch.save(best_state, model_path)
     print(f"  Saved -> {model_path}")
 
-    print("[5/5] Evaluating on test set ...")
+    print("\nEvaluating on test set ...")
     model.load_state_dict(best_state)
     model.eval()
 
@@ -200,8 +222,8 @@ def main():
     metrics_text = (
         "MiniMol Evidential GSL -- Uncertainty Model (AqSolDB)\n"
         "========================================================\n"
-        "Model: MiniMol (512-d) -> EvidentialGSLModel(embed_dim=512)\n"
-        "[Internal uncertainty source for soft weighting]\n"
+        f"Model: MiniMol (512-d) -> EvidentialGSLModel(embed_dim={EMBED_DIM})\n"
+        f"[Internal uncertainty source for soft weighting, trained on seed={UNCERTAINTY_SEED} split]\n"
         "\n"
         f"RMSE                    : {rmse:.4f}\n"
         f"MAE                     : {mae:.4f}\n"

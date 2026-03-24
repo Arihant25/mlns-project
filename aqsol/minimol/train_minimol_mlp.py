@@ -1,16 +1,20 @@
 """
 train_minimol_mlp.py
 ====================
-MiniMol "as-is" baseline: train a simple MLP on 512-d MiniMol embeddings.
+MiniMol "as-is" baseline: train a simple MLP on 512-d MiniMol embeddings
+using the TDC ADMET benchmark group evaluation protocol.
 
 Reproduces the TDC ADMET leaderboard Rank-1 approach for AqSolDB
 (MAE 0.741 +/- 0.013). Runs 5 independent seeds [1,2,3,4,5] per TDC
-evaluation protocol and reports mean +/- std.
+evaluation protocol with per-seed train/valid splits and a fixed test set.
 
 Architecture: 512 -> 256 -> GELU -> Dropout -> 128 -> GELU -> Dropout -> 1
 
 Usage:
     python train_minimol_mlp.py
+
+Prerequisites:
+    python generate_embeddings_minimol.py
 """
 
 import copy
@@ -20,10 +24,10 @@ import time
 
 import numpy as np
 import torch
-from scipy.stats import pearsonr, spearmanr
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
+from tdc.benchmark_group import admet_group
 
 # ── Configuration ────────────────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
@@ -36,7 +40,7 @@ LR = 1e-3
 MAX_EPOCHS = 100
 PATIENCE = 10
 LR_PATIENCE = 5
-EMBED_DIM = 512  # MiniMol output dimension
+EMBED_DIM = 512
 
 SEEDS = [1, 2, 3, 4, 5]  # TDC standard
 
@@ -54,13 +58,8 @@ class EmbeddingDataset(Dataset):
         return self.embeddings[idx], self.targets[idx]
 
 
-# ── MLP (MiniMol standard approach) ─────────────────────────────────────────
+# ── MLP ──────────────────────────────────────────────────────────────────────
 class MiniMolMLP(nn.Module):
-    """
-    Lightweight MLP matching the standard MiniMol downstream head:
-        512 -> 256 -> GELU -> Dropout(0.1) -> 128 -> GELU -> Dropout(0.1) -> 1
-    """
-
     def __init__(self, input_dim: int = EMBED_DIM, dropout: float = 0.1):
         super().__init__()
         self.net = nn.Sequential(
@@ -85,14 +84,6 @@ def set_seed(seed: int):
     if torch.cuda.is_available():
         torch.cuda.manual_seed_all(seed)
     torch.backends.cudnn.deterministic = True
-
-
-def load_tensors(split: str):
-    emb = torch.load(
-        os.path.join(DATA_DIR, f"{split}_embeddings_minimol.pt"), weights_only=True
-    )
-    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"), weights_only=True)
-    return emb, tgt
 
 
 def format_eta(seconds: float) -> str:
@@ -131,8 +122,8 @@ def evaluate(model, loader, criterion):
     return total / n
 
 
-def run_single_seed(seed, train_emb, val_emb, test_emb,
-                    train_tgt_s, val_tgt_s, test_tgt_s, scaler):
+def run_seed(seed, train_emb, train_tgt_s, val_emb, val_tgt_s,
+             test_emb, test_tgt_s, scaler):
     set_seed(seed)
 
     train_loader = DataLoader(
@@ -156,7 +147,6 @@ def run_single_seed(seed, train_emb, val_emb, test_emb,
         train_loss = train_one_epoch(model, train_loader, criterion, optimizer)
         val_loss = evaluate(model, val_loader, criterion)
         scheduler.step(val_loss)
-
         epoch_times.append(time.perf_counter() - t0)
         eta_s = (sum(epoch_times) / len(epoch_times)) * (MAX_EPOCHS - epoch)
         print(
@@ -170,7 +160,6 @@ def run_single_seed(seed, train_emb, val_emb, test_emb,
             no_improve = 0
         else:
             no_improve += 1
-
         if no_improve >= PATIENCE:
             print(f"    [seed={seed}] Early stopping at epoch {epoch}")
             break
@@ -178,81 +167,93 @@ def run_single_seed(seed, train_emb, val_emb, test_emb,
     model.load_state_dict(best_state)
     model.eval()
 
-    preds_all, tgts_all = [], []
+    preds_all = []
     with torch.no_grad():
-        for x, y in test_loader:
+        for x, _ in test_loader:
             preds_all.append(model(x.to(DEVICE)).squeeze(-1).cpu().numpy())
-            tgts_all.append(y.numpy())
 
     p_s = np.concatenate(preds_all)
-    t_s = np.concatenate(tgts_all)
-    p = scaler.inverse_transform(p_s.reshape(-1, 1)).flatten()
-    t = scaler.inverse_transform(t_s.reshape(-1, 1)).flatten()
-
-    rmse = float(np.sqrt(np.mean((p - t) ** 2)))
-    mae = float(np.mean(np.abs(p - t)))
-    r = float(pearsonr(p, t)[0])
-    rho = float(spearmanr(p, t)[0])
-    return rmse, mae, r, rho
+    # Inverse-transform to original scale for TDC evaluation
+    return scaler.inverse_transform(p_s.reshape(-1, 1)).flatten()
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
 def main():
     os.makedirs(RESULTS_DIR, exist_ok=True)
 
-    print("[1/3] Loading MiniMol embeddings ...")
-    train_emb, train_tgt = load_tensors("train")
-    val_emb, val_tgt = load_tensors("val")
-    test_emb, test_tgt = load_tensors("test")
+    print("[1/3] Loading TDC ADMET benchmark group ...")
+    group = admet_group(path=DATA_DIR)
+    benchmark = group.get("Solubility_AqSolDB")
+    name = benchmark["name"]
+
+    print("[2/3] Loading MiniMol embeddings ...")
+    all_tv_emb = torch.load(
+        os.path.join(DATA_DIR, "trainval_embeddings_minimol.pt"), weights_only=True
+    )
+    all_tv_tgt = torch.load(
+        os.path.join(DATA_DIR, "trainval_targets.pt"), weights_only=True
+    )
+    all_tv_smi = torch.load(os.path.join(DATA_DIR, "trainval_smiles.pt"))
+    test_emb = torch.load(
+        os.path.join(DATA_DIR, "test_embeddings_minimol.pt"), weights_only=True
+    )
+    test_tgt = torch.load(
+        os.path.join(DATA_DIR, "test_targets.pt"), weights_only=True
+    )
     print(
-        f"       Train: {train_emb.shape[0]}, Val: {val_emb.shape[0]}, "
-        f"Test: {test_emb.shape[0]}  |  embed_dim={train_emb.shape[1]}"
+        f"       TrainVal: {all_tv_emb.shape[0]}, Test: {test_emb.shape[0]}"
+        f"  |  embed_dim={all_tv_emb.shape[1]}"
     )
 
-    print("[2/3] Fitting StandardScaler ...")
+    smi_to_idx = {s: i for i, s in enumerate(all_tv_smi)}
+
+    # Scaler fitted on full train_val targets (superset of any seed's training set)
     scaler = StandardScaler()
-    scaler.fit(train_tgt.numpy().reshape(-1, 1))
+    scaler.fit(all_tv_tgt.numpy().reshape(-1, 1))
 
     def scale(t):
         return torch.tensor(
             scaler.transform(t.numpy().reshape(-1, 1)).flatten(), dtype=torch.float32
         )
 
-    train_tgt_s = scale(train_tgt)
-    val_tgt_s = scale(val_tgt)
     test_tgt_s = scale(test_tgt)
 
     print(f"[3/3] Running {len(SEEDS)} seeds: {SEEDS} ...")
-    results = []
+    predictions_list = []
+
     for seed in SEEDS:
         print(f"  -- seed={seed} --")
-        m = run_single_seed(
-            seed, train_emb, val_emb, test_emb,
-            train_tgt_s, val_tgt_s, test_tgt_s, scaler
+        train_df, val_df = group.get_train_valid_split(
+            benchmark=name, split_type="default", seed=seed
         )
-        print(f"  seed={seed}  RMSE={m[0]:.4f}  MAE={m[1]:.4f}  r={m[2]:.4f}  rho={m[3]:.4f}")
-        results.append(m)
 
-    arr = np.array(results)
-    means = arr.mean(axis=0)
-    stds = arr.std(axis=0)
+        t_idx = [smi_to_idx[s] for s in train_df["Drug"].tolist()]
+        v_idx = [smi_to_idx[s] for s in val_df["Drug"].tolist()]
+
+        train_emb = all_tv_emb[t_idx]
+        val_emb = all_tv_emb[v_idx]
+        train_tgt_s = scale(all_tv_tgt[t_idx])
+        val_tgt_s = scale(all_tv_tgt[v_idx])
+
+        y_pred = run_seed(
+            seed, train_emb, train_tgt_s, val_emb, val_tgt_s,
+            test_emb, test_tgt_s, scaler,
+        )
+        predictions_list.append({name: y_pred})
+
+    results = group.evaluate_many(predictions_list)
+    mean_mae, std_mae = list(results.values())[0]
 
     metrics_text = (
         "MiniMol As-Is Baseline -- MLP Test Metrics (AqSolDB)\n"
         "=======================================================\n"
         "Model: MiniMol (512-d) -> 512->256->128->1 MLP\n"
         f"Seeds: {SEEDS}\n"
-        f"TDC Rank-1 reference: MAE 0.741 +/- 0.013\n"
+        "TDC Rank-1 reference: MAE 0.741 +/- 0.013\n"
         "\n"
-        f"RMSE     : {means[0]:.4f} +/- {stds[0]:.4f}\n"
-        f"MAE      : {means[1]:.4f} +/- {stds[1]:.4f}\n"
-        f"Pearson  : {means[2]:.4f} +/- {stds[2]:.4f}\n"
-        f"Spearman : {means[3]:.4f} +/- {stds[3]:.4f}\n"
-        "\nPer-seed results:\n"
+        f"MAE      : {mean_mae:.4f} +/- {std_mae:.4f}\n"
+        "\n[Evaluated via group.evaluate_many -- TDC official metric]\n"
     )
-    for seed, m in zip(SEEDS, results):
-        metrics_text += f"  seed={seed}  RMSE={m[0]:.4f}  MAE={m[1]:.4f}  r={m[2]:.4f}  rho={m[3]:.4f}\n"
-
     print("\n" + metrics_text)
 
     metrics_path = os.path.join(RESULTS_DIR, "minimol_baseline_mlp_metrics.txt")

@@ -9,12 +9,16 @@ EvidentialGSLModel:
 
     loss = mean(exp(-gamma * u_i) * (y_hat_i - y_i)^2)
 
-Sweeps over GAMMAS x SEEDS [1,2,3,4,5] (TDC standard).
+Uses the TDC ADMET benchmark group evaluation protocol:
+  - Per-seed train/valid splits via get_train_valid_split
+  - Fixed benchmark test set evaluated via group.evaluate_many
+  - Sweeps over GAMMAS x SEEDS [1,2,3,4,5]
 
 Usage:
     python train_minimol_weighted_mlp.py
 
 Prerequisites:
+    python generate_embeddings_minimol.py
     python train_minimol_evidential_gsl.py  -> results/evidential_gsl_minimol.pt
 """
 
@@ -26,12 +30,10 @@ import time
 
 import numpy as np
 import torch
-from rdkit import Chem, RDLogger
-from rdkit.Chem import AllChem, DataStructs
-from scipy.stats import pearsonr, spearmanr
 from sklearn.preprocessing import StandardScaler
 from torch import nn
 from torch.utils.data import DataLoader, Dataset
+from tdc.benchmark_group import admet_group
 
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 GSL_DIR = os.path.join(PROJECT_ROOT, "gsl")
@@ -54,8 +56,6 @@ EMBED_DIM = 512
 
 GAMMAS = [0.0, 7.0, 10.0, 12.5, 15.0, 20.0]
 SEEDS = [1, 2, 3, 4, 5]  # TDC standard
-
-RDLogger.DisableLog("rdApp.warning")
 
 
 # ── Dataset ──────────────────────────────────────────────────────────────────
@@ -100,21 +100,6 @@ def set_seed(seed: int):
     torch.backends.cudnn.deterministic = True
 
 
-def load_tensors(split: str):
-    emb = torch.load(
-        os.path.join(DATA_DIR, f"{split}_embeddings_minimol.pt"), weights_only=True
-    )
-    tgt = torch.load(os.path.join(DATA_DIR, f"{split}_targets.pt"), weights_only=True)
-    return emb, tgt
-
-
-def load_smiles():
-    return {
-        s: torch.load(os.path.join(DATA_DIR, f"{s}_smiles.pt"))
-        for s in ("train", "val", "test")
-    }
-
-
 def format_eta(seconds: float) -> str:
     seconds = max(0, int(seconds))
     h, rem = divmod(seconds, 3600)
@@ -122,25 +107,17 @@ def format_eta(seconds: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d}"
 
 
-def extract_uncertainties(train_emb, train_tgt_s, train_smiles):
-    print("  Loading EvidentialGSLModel(embed_dim=512) for uncertainty extraction ...")
-    model = EvidentialGSLModel(embed_dim=EMBED_DIM)
-    state = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
-    model.load_state_dict(state)
-    model.to(DEVICE)
-    model.eval()
-
+def extract_uncertainties(emb, tgt_s, smiles, unc_model):
+    """Run EvidentialGSLModel inference and return per-sample aleatoric uncertainty."""
     loader = DataLoader(
-        GSLDataset(train_emb, train_tgt_s, train_smiles),
-        batch_size=train_emb.shape[0], shuffle=False, collate_fn=gsl_collate_fn,
+        GSLDataset(emb, tgt_s, smiles),
+        batch_size=emb.shape[0], shuffle=False, collate_fn=gsl_collate_fn,
     )
     with torch.no_grad():
         for X, _, A in loader:
             X, A = X.to(DEVICE), A.to(DEVICE)
-            _, (_, _, alpha, beta) = model(X, A)
-
+            _, (_, _, alpha, beta) = unc_model(X, A)
     u = (beta / (alpha - 1.0)).detach().cpu()
-    print(f"  Uncertainty: min={u.min():.4f}  max={u.max():.4f}  mean={u.mean():.4f}")
     return u
 
 
@@ -173,30 +150,20 @@ def evaluate_mse(model, loader):
 
 
 @torch.no_grad()
-def test_metrics(model, loader, scaler):
+def get_test_predictions(model, loader, scaler):
     model.eval()
-    preds_all, tgts_all = [], []
-    for x, y, _ in loader:
+    preds_all = []
+    for x, _, __ in loader:
         preds_all.append(model(x.to(DEVICE)).squeeze(-1).cpu().numpy())
-        tgts_all.append(y.numpy())
-
-    p = scaler.inverse_transform(np.concatenate(preds_all).reshape(-1, 1)).flatten()
-    t = scaler.inverse_transform(np.concatenate(tgts_all).reshape(-1, 1)).flatten()
-
-    return (
-        float(np.sqrt(np.mean((p - t) ** 2))),
-        float(np.mean(np.abs(p - t))),
-        float(pearsonr(p, t)[0]),
-        float(spearmanr(p, t)[0]),
-    )
+    p_s = np.concatenate(preds_all)
+    return scaler.inverse_transform(p_s.reshape(-1, 1)).flatten()
 
 
-def run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler):
+def run_seed(seed, gamma, train_ds, val_ds, test_loader, scaler):
     set_seed(seed)
 
     train_loader = DataLoader(train_ds, batch_size=BATCH_SIZE, shuffle=True)
     val_loader = DataLoader(val_ds, batch_size=BATCH_SIZE)
-    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE)
 
     model = MiniMolMLP(input_dim=EMBED_DIM).to(DEVICE)
     optimizer = torch.optim.AdamW(model.parameters(), lr=LR)
@@ -212,7 +179,6 @@ def run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler):
         train_one_epoch(model, train_loader, optimizer, gamma)
         val_loss = evaluate_mse(model, val_loader)
         scheduler.step(val_loss)
-
         epoch_times.append(time.perf_counter() - t0)
         eta_s = (sum(epoch_times) / len(epoch_times)) * (MAX_EPOCHS - epoch)
         print(
@@ -230,7 +196,7 @@ def run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler):
             break
 
     model.load_state_dict(best_state)
-    return test_metrics(model, test_loader, scaler)
+    return get_test_predictions(model, test_loader, scaler)
 
 
 # ── Main ─────────────────────────────────────────────────────────────────────
@@ -242,88 +208,120 @@ def main():
             f"Missing {MODEL_PATH}. Run train_minimol_evidential_gsl.py first."
         )
 
-    print("[1/3] Loading data ...")
-    train_emb, train_tgt = load_tensors("train")
-    val_emb, val_tgt = load_tensors("val")
-    test_emb, test_tgt = load_tensors("test")
-    smiles = load_smiles()
+    print("[1/4] Loading TDC ADMET benchmark group ...")
+    group = admet_group(path=DATA_DIR)
+    benchmark = group.get("Solubility_AqSolDB")
+    name = benchmark["name"]
+
+    print("[2/4] Loading MiniMol embeddings ...")
+    all_tv_emb = torch.load(
+        os.path.join(DATA_DIR, "trainval_embeddings_minimol.pt"), weights_only=True
+    )
+    all_tv_tgt = torch.load(
+        os.path.join(DATA_DIR, "trainval_targets.pt"), weights_only=True
+    )
+    all_tv_smi = torch.load(os.path.join(DATA_DIR, "trainval_smiles.pt"))
+    test_emb = torch.load(
+        os.path.join(DATA_DIR, "test_embeddings_minimol.pt"), weights_only=True
+    )
+    test_tgt = torch.load(
+        os.path.join(DATA_DIR, "test_targets.pt"), weights_only=True
+    )
+    smi_to_idx = {s: i for i, s in enumerate(all_tv_smi)}
 
     scaler = StandardScaler()
-    scaler.fit(train_tgt.numpy().reshape(-1, 1))
+    scaler.fit(all_tv_tgt.numpy().reshape(-1, 1))
 
     def scale(t):
         return torch.tensor(
             scaler.transform(t.numpy().reshape(-1, 1)).flatten(), dtype=torch.float32
         )
 
-    train_tgt_s = scale(train_tgt)
-    val_tgt_s = scale(val_tgt)
     test_tgt_s = scale(test_tgt)
-
-    print("[2/3] Extracting uncertainties from EvidentialGSL ...")
-    u_train = extract_uncertainties(train_emb, train_tgt_s, smiles["train"])
-    u_zero = torch.zeros
-
-    train_ds = WeightedEmbeddingDataset(train_emb, train_tgt_s, u_train)
-    val_ds = WeightedEmbeddingDataset(val_emb, val_tgt_s, torch.zeros(val_emb.shape[0]))
     test_ds = WeightedEmbeddingDataset(test_emb, test_tgt_s, torch.zeros(test_emb.shape[0]))
+    test_loader = DataLoader(test_ds, batch_size=BATCH_SIZE)
 
-    print(f"[3/3] Sweep: {len(GAMMAS)} gammas x {len(SEEDS)} seeds ...")
-    results = []
+    print("[3/4] Loading EvidentialGSLModel for uncertainty extraction ...")
+    unc_model = EvidentialGSLModel(embed_dim=EMBED_DIM)
+    unc_model.load_state_dict(
+        torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+    )
+    unc_model.to(DEVICE)
+    unc_model.eval()
+
+    print(f"[4/4] Sweep: {len(GAMMAS)} gammas x {len(SEEDS)} seeds ...")
+    sweep_results = []
     total_runs = len(GAMMAS) * len(SEEDS)
     completed = 0
     sweep_start = time.perf_counter()
 
     for gamma in GAMMAS:
         print(f"  -- gamma={gamma} --")
-        fold = []
+        gamma_predictions = []
+
         for seed in SEEDS:
-            m = run_single_seed(seed, gamma, train_ds, val_ds, test_ds, scaler)
-            print(
-                f"    seed={seed}  RMSE={m[0]:.4f}  MAE={m[1]:.4f}  "
-                f"r={m[2]:.4f}  rho={m[3]:.4f}"
+            train_df, val_df = group.get_train_valid_split(
+                benchmark=name, split_type="default", seed=seed
             )
-            fold.append(m)
+
+            t_idx = [smi_to_idx[s] for s in train_df["Drug"].tolist()]
+            v_idx = [smi_to_idx[s] for s in val_df["Drug"].tolist()]
+
+            train_emb = all_tv_emb[t_idx]
+            val_emb = all_tv_emb[v_idx]
+            train_smi = train_df["Drug"].tolist()
+            train_tgt_s = scale(all_tv_tgt[t_idx])
+            val_tgt_s = scale(all_tv_tgt[v_idx])
+
+            u_train = extract_uncertainties(train_emb, train_tgt_s, train_smi, unc_model)
+            print(
+                f"    [seed={seed}] Uncertainty: "
+                f"min={u_train.min():.4f}  max={u_train.max():.4f}  mean={u_train.mean():.4f}"
+            )
+
+            train_ds = WeightedEmbeddingDataset(train_emb, train_tgt_s, u_train)
+            val_ds = WeightedEmbeddingDataset(val_emb, val_tgt_s, torch.zeros(val_emb.shape[0]))
+
+            y_pred = run_seed(seed, gamma, train_ds, val_ds, test_loader, scaler)
+            gamma_predictions.append({name: y_pred})
+
             completed += 1
-            eta_s = ((time.perf_counter() - sweep_start) / completed) * (total_runs - completed)
+            eta_s = (
+                (time.perf_counter() - sweep_start) / completed
+            ) * (total_runs - completed)
             print(f"      [sweep ETA] {format_eta(eta_s)}")
 
-        arr = np.array(fold)
-        means, stds = arr.mean(0), arr.std(0)
-        results.append({
+        results = group.evaluate_many(gamma_predictions)
+        mean_mae, std_mae = list(results.values())[0]
+        sweep_results.append({
             "gamma": gamma,
-            "rmse_mean": means[0], "rmse_std": stds[0],
-            "mae_mean": means[1], "mae_std": stds[1],
-            "r_mean": means[2], "r_std": stds[2],
-            "rho_mean": means[3], "rho_std": stds[3],
+            "mae_mean": mean_mae,
+            "mae_std": std_mae,
         })
-        print(
-            f"    mean  RMSE={means[0]:.4f}+/-{stds[0]:.4f}  "
-            f"MAE={means[1]:.4f}+/-{stds[1]:.4f}"
-        )
+        print(f"    gamma={gamma:.2f}  MAE={mean_mae:.4f} +/- {std_mae:.4f}")
 
-    best = min(results, key=lambda x: x["mae_mean"])
+    best = min(sweep_results, key=lambda x: x["mae_mean"])
     lines = [
         "MiniMol + Soft-Weighted MLP -- AqSolDB",
         "=========================================",
         "Model: MiniMolMLP  |  Uncertainty: EvidentialGSLModel(512-d)",
         f"Seeds: {SEEDS}",
+        "TDC Rank-1 reference: MAE 0.741 +/- 0.013",
         "",
-        f"{'gamma':>7s}  {'RMSE':>15s}  {'MAE':>15s}  {'Pearson':>15s}  {'Spearman':>15s}",
-        "-" * 80,
+        f"{'gamma':>7s}  {'MAE':>20s}",
+        "-" * 35,
     ]
-    for r in results:
+    for r in sweep_results:
         lines.append(
             f"{r['gamma']:>7.2f}  "
-            f"{r['rmse_mean']:.4f}+/-{r['rmse_std']:.4f}  "
-            f"{r['mae_mean']:.4f}+/-{r['mae_std']:.4f}  "
-            f"{r['r_mean']:.4f}+/-{r['r_std']:.4f}  "
-            f"{r['rho_mean']:.4f}+/-{r['rho_std']:.4f}"
+            f"{r['mae_mean']:.4f} +/- {r['mae_std']:.4f}"
         )
     lines += [
-        "", "-" * 80,
+        "", "-" * 35,
         f"Best MAE at gamma={best['gamma']:.2f}: "
         f"{best['mae_mean']:.4f} +/- {best['mae_std']:.4f}",
+        "",
+        "[Evaluated via group.evaluate_many -- TDC official metric]",
     ]
 
     report = "\n".join(lines)

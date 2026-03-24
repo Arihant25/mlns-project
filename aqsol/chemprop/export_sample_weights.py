@@ -4,24 +4,18 @@ export_sample_weights.py
 Export per-sample soft weights for Chemprop training using aleatoric
 uncertainty from the trained MiniMol EvidentialGSLModel (512-d).
 
-For each gamma in GAMMAS:
+For each seed and gamma:
     w_i = exp(-gamma * u_i)
 
-Writes the weight as an additional column in the training CSV so that
-Chemprop v2's -w / --weight-column flag can reference it.
-
-Outputs (one per gamma):
-    data/chemprop_train_gamma_{gamma}.csv  -- train CSV with 'weight' column added
-
-Also saves:
-    data/train_uncertainties.pt  -- raw u_i tensor for reuse
+Outputs:
+    data/chemprop_train_gamma_{gamma}_seed_{s}.csv  -- train CSV with 'weight' column
 
 Usage:
     python export_sample_weights.py
 
 Prerequisites:
-    Run minimol/train_minimol_evidential_gsl.py  -> results/evidential_gsl_minimol.pt
-    Run export_chemprop_data.py                  -> data/chemprop_train.csv
+    python minimol/train_minimol_evidential_gsl.py  -> results/evidential_gsl_minimol.pt
+    python export_chemprop_data.py                  -> data/chemprop_train_seed_*.csv
 """
 
 import os
@@ -30,9 +24,10 @@ import sys
 import numpy as np
 import pandas as pd
 import torch
+from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
+from tdc.benchmark_group import admet_group
 
-# ── Cross-directory imports ───────────────────────────────────────────────────
 PROJECT_ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 GSL_DIR = os.path.join(PROJECT_ROOT, "gsl")
 sys.path.insert(0, GSL_DIR)
@@ -40,14 +35,14 @@ sys.path.insert(0, GSL_DIR)
 from gsl_utils import GSLDataset, gsl_collate_fn  # noqa: E402
 from model_evidential_gsl import EvidentialGSLModel  # noqa: E402
 
-# ── Configuration ────────────────────────────────────────────────────────────
 DATA_DIR = os.path.join(PROJECT_ROOT, "data")
 RESULTS_DIR = os.path.join(PROJECT_ROOT, "results")
-MODEL_PATH = os.path.join(RESULTS_DIR, "evidential_gsl_minimol.pt")  # MiniMol 512-d model
+MODEL_PATH = os.path.join(RESULTS_DIR, "evidential_gsl_minimol.pt")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 GAMMAS = [0.0, 7.0, 10.0, 12.5, 15.0, 20.0]
-EMBED_DIM = 512  # MiniMol output dimension
+EMBED_DIM = 512
+SEEDS = [1, 2, 3, 4, 5]
 
 
 def main():
@@ -58,81 +53,80 @@ def main():
             f"Missing {MODEL_PATH}. Run minimol/train_minimol_evidential_gsl.py first."
         )
 
-    # 1. Load training embeddings and SMILES (MiniMol 512-d)
-    print("[1/3] Loading MiniMol training embeddings and SMILES ...")
-    train_emb = torch.load(
-        os.path.join(DATA_DIR, "train_embeddings_minimol.pt"), weights_only=True
+    print("[1/3] Loading MiniMol trainval embeddings and benchmark group ...")
+    all_tv_emb = torch.load(
+        os.path.join(DATA_DIR, "trainval_embeddings_minimol.pt"), weights_only=True
     )
-    train_tgt = torch.load(
-        os.path.join(DATA_DIR, "train_targets.pt"), weights_only=True
+    all_tv_tgt = torch.load(
+        os.path.join(DATA_DIR, "trainval_targets.pt"), weights_only=True
     )
-    train_smiles = torch.load(os.path.join(DATA_DIR, "train_smiles.pt"))
-    print(f"       Train: {train_emb.shape[0]} molecules, embed_dim={train_emb.shape[1]}")
+    all_tv_smi = torch.load(os.path.join(DATA_DIR, "trainval_smiles.pt"))
+    smi_to_idx = {s: i for i, s in enumerate(all_tv_smi)}
+    print(f"       TrainVal: {all_tv_emb.shape[0]} molecules, embed_dim={all_tv_emb.shape[1]}")
 
-    # Scale targets (same as during training -- fit on train only)
-    from sklearn.preprocessing import StandardScaler
+    # Scaler consistent with training scripts
     scaler = StandardScaler()
-    train_tgt_s = torch.tensor(
-        scaler.fit_transform(train_tgt.numpy().reshape(-1, 1)).flatten(),
-        dtype=torch.float32,
-    )
+    scaler.fit(all_tv_tgt.numpy().reshape(-1, 1))
 
-    # 2. Run EvidentialGSLModel inference to get u_i
-    print("[2/3] Running EvidentialGSLModel(512-d) inference ...")
-    model = EvidentialGSLModel(embed_dim=EMBED_DIM)
-    state = torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
-    model.load_state_dict(state)
-    model.to(DEVICE)
-    model.eval()
-
-    n = train_emb.shape[0]
-    loader = DataLoader(
-        GSLDataset(train_emb, train_tgt_s, train_smiles),
-        batch_size=n,
-        shuffle=False,
-        collate_fn=gsl_collate_fn,
-    )
-
-    with torch.no_grad():
-        for X, _, A_ecfp in loader:
-            X, A_ecfp = X.to(DEVICE), A_ecfp.to(DEVICE)
-            _, (_, _, alpha, beta) = model(X, A_ecfp)
-
-    u = (beta / (alpha - 1.0)).detach().cpu()
-    print(f"       Uncertainty: min={u.min():.4f} max={u.max():.4f} mean={u.mean():.4f}")
-
-    # Save raw uncertainties for reuse
-    u_path = os.path.join(DATA_DIR, "train_uncertainties.pt")
-    torch.save(u, u_path)
-    print(f"       Saved uncertainties -> {u_path}")
-
-    # 3. Load base training CSV and embed weight column per gamma
-    print(f"[3/3] Writing weighted training CSVs for {len(GAMMAS)} gamma values ...")
-    chemprop_train_path = os.path.join(DATA_DIR, "chemprop_train.csv")
-    if not os.path.exists(chemprop_train_path):
-        raise FileNotFoundError(
-            f"Missing {chemprop_train_path}. Run export_chemprop_data.py first."
-        )
-    base_df = pd.read_csv(chemprop_train_path)
-
-    if len(base_df) != len(train_smiles):
-        raise ValueError(
-            f"Row count mismatch: chemprop_train.csv has {len(base_df)} rows "
-            f"but train_smiles has {len(train_smiles)} entries. "
-            "Ensure both use the same scaffold split."
+    def scale(t):
+        return torch.tensor(
+            scaler.transform(t.numpy().reshape(-1, 1)).flatten(), dtype=torch.float32
         )
 
-    u_np = u.numpy()
-    for gamma in GAMMAS:
-        weights = np.exp(-gamma * u_np)
-        df_w = base_df.copy()
-        df_w["weight"] = weights
-        out_path = os.path.join(DATA_DIR, f"chemprop_train_gamma_{gamma}.csv")
-        df_w.to_csv(out_path, index=False)
+    group = admet_group(path=DATA_DIR)
+    benchmark = group.get("Solubility_AqSolDB")
+    name = benchmark["name"]
+
+    print("[2/3] Loading EvidentialGSLModel ...")
+    unc_model = EvidentialGSLModel(embed_dim=EMBED_DIM)
+    unc_model.load_state_dict(
+        torch.load(MODEL_PATH, map_location=DEVICE, weights_only=True)
+    )
+    unc_model.to(DEVICE)
+    unc_model.eval()
+
+    print(f"[3/3] Writing weighted CSVs for {len(SEEDS)} seeds x {len(GAMMAS)} gammas ...")
+    for seed in SEEDS:
+        train_df, _ = group.get_train_valid_split(
+            benchmark=name, split_type="default", seed=seed
+        )
+        t_idx = [smi_to_idx[s] for s in train_df["Drug"].tolist()]
+        train_emb = all_tv_emb[t_idx]
+        train_smi = train_df["Drug"].tolist()
+        train_tgt_s = scale(all_tv_tgt[t_idx])
+
+        # Run uncertainty inference
+        loader = DataLoader(
+            GSLDataset(train_emb, train_tgt_s, train_smi),
+            batch_size=train_emb.shape[0], shuffle=False, collate_fn=gsl_collate_fn,
+        )
+        with torch.no_grad():
+            for X, _, A in loader:
+                X, A = X.to(DEVICE), A.to(DEVICE)
+                _, (_, _, alpha, beta) = unc_model(X, A)
+        u = (beta / (alpha - 1.0)).detach().cpu().numpy()
         print(
-            f"       gamma={gamma:5.1f}  weight range [{weights.min():.4f}, "
-            f"{weights.max():.4f}]  -> {out_path}"
+            f"  seed={seed}  uncertainty: "
+            f"min={u.min():.4f}  max={u.max():.4f}  mean={u.mean():.4f}"
         )
+
+        base_csv = os.path.join(DATA_DIR, f"chemprop_train_seed_{seed}.csv")
+        if not os.path.exists(base_csv):
+            raise FileNotFoundError(
+                f"Missing {base_csv}. Run export_chemprop_data.py first."
+            )
+        base_df = pd.read_csv(base_csv)
+
+        for gamma in GAMMAS:
+            weights = np.exp(-gamma * u)
+            df_w = base_df.copy()
+            df_w["weight"] = weights
+            out_path = os.path.join(DATA_DIR, f"chemprop_train_gamma_{gamma}_seed_{seed}.csv")
+            df_w.to_csv(out_path, index=False)
+            print(
+                f"    gamma={gamma:5.1f}  seed={seed}  "
+                f"weight range [{weights.min():.4f}, {weights.max():.4f}]"
+            )
 
     print("\nDone -- weighted CSVs ready for train_chemprop_weighted.py")
 

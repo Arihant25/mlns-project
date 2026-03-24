@@ -1,13 +1,13 @@
 MiniMol Evidential GSL -- Uncertainty Model (AqSolDB)
 ========================================================
 Model: MiniMol (512-d) -> EvidentialGSLModel(embed_dim=512)
-[Internal uncertainty source for soft weighting]
+[Internal uncertainty source for soft weighting, trained on seed=1 split]
 
-RMSE                    : 1.0696
-MAE                     : 0.7671
-Pearson  (r)            : 0.8868
-Spearman (rho)          : 0.8714
-Mean Aleatoric Unc.     : 0.2652
-Spearman(u, |error|)    : 0.1473
+RMSE                    : 1.1210
+MAE                     : 0.7840
+Pearson  (r)            : 0.8741
+Spearman (rho)          : 0.8502
+Mean Aleatoric Unc.     : 0.2835
+Spearman(u, |error|)    : 0.2585
 
-Model weights           : C:\Users\Arihant\Git\mlns-project\aqsol\minimol\..\results\evidential_gsl_minimol.pt
+Model weights           : /home/ineshshukla/dev/mlns/mlns-project/aqsol/minimol/../results/evidential_gsl_minimol.pt

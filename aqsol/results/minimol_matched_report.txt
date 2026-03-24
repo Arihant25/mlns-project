@@ -1,0 +1,15 @@
+MiniMol Matched Protocol -- AqSolDB
+=====================================
+Head:     512 -> 1024x3 -> cat(1024,512) -> 1  [BN+ReLU+skip]
+Optimizer: Adam lr=0.0005 wd=0.0001  |  Cosine warmup 5/25ep
+Seeds:    [1, 2, 3, 4, 5]
+
+Run                                                  MAE
+----------------------------------------------------------
+Frozen baseline (gamma=0)         0.8070 +/- 0.0270
+Frozen weighted (gamma=20)        0.8070 +/- 0.0150
+
+----------------------------------------------------------
+TDC Rank-1 (MiniMol, 5x5 ensemble): 0.7410 +/- 0.0130
+
+[Evaluated via group.evaluate_many -- TDC official metric]
