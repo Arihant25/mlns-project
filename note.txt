@@ -1,0 +1,7 @@
+Alrught so previously we were working with evidential gsl ( refer @train_evidential_gsl.py for dataset accessing and evidential gsl framework).
+
+Now we want to shift and write a proof of concept. Refer @context.md
+
+Now for each of these two write seperate master test scipts in augmentation/ and meta/ respectively.
+
+The models should be trained on 5 seeds wherever applicable and results stored to meta/results and augmentation/results respectively.

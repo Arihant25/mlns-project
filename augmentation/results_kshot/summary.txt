@@ -1,0 +1,37 @@
+=================================================================
+PoC 1 v4 — K-Shot Transductive Semi-Supervised GSL
+=================================================================
+
+Exp A  Classification (AUROC ↑)
+  K=10:
+    target_only              : 0.5528 ± 0.0480
+    random_aug               : 0.5579 ± 0.0446
+    similarity_only          : 0.5478 ± 0.0504
+    evidential_oracle        : 0.5544 ± 0.0513
+  K=20:
+    target_only              : 0.5574 ± 0.0403
+    random_aug               : 0.5575 ± 0.0407
+    similarity_only          : 0.5524 ± 0.0356
+    evidential_oracle        : 0.5590 ± 0.0396
+  K=50:
+    target_only              : 0.5743 ± 0.0403
+    random_aug               : 0.5709 ± 0.0359
+    similarity_only          : 0.5704 ± 0.0411
+    evidential_oracle        : 0.5700 ± 0.0429
+
+Exp B  Regression     (RMSE  ↓)
+  K=10:
+    target_only              : 0.7585 ± 0.0723
+    random_aug               : 0.7631 ± 0.0726
+    similarity_only          : 0.7645 ± 0.0714
+    evidential_oracle        : 0.7616 ± 0.0726
+  K=20:
+    target_only              : 0.7148 ± 0.0643
+    random_aug               : 0.7128 ± 0.0642
+    similarity_only          : 0.7133 ± 0.0654
+    evidential_oracle        : 0.7125 ± 0.0663
+  K=50:
+    target_only              : 0.6374 ± 0.0335
+    random_aug               : 0.6395 ± 0.0444
+    similarity_only          : 0.6358 ± 0.0383
+    evidential_oracle        : 0.6370 ± 0.0362

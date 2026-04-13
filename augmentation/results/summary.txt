@@ -1,0 +1,15 @@
+============================================================
+PoC 1 v2 — Uncertainty Oracle Augmentation (GSL pipeline)
+============================================================
+
+Exp A  Classification (AUROC ↑)
+  target_only              : 0.6177 ± 0.0106  [AUROC]
+  random_aug               : 0.6116 ± 0.0099  [AUROC]
+  similarity_only          : 0.6090 ± 0.0069  [AUROC]
+  evidential_oracle        : 0.6058 ± 0.0068  [AUROC]
+
+Exp B  Regression     (RMSE  ↓)
+  target_only              : 0.5646 ± 0.0418  [RMSE]
+  random_aug               : 0.5434 ± 0.0249  [RMSE]
+  similarity_only          : 0.5667 ± 0.0506  [RMSE]
+  evidential_oracle        : 0.5600 ± 0.0433  [RMSE]

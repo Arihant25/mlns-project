@@ -1,0 +1,67 @@
+====================================================================
+PoC 3 — Hopfield Context + Evidential GSL + FOMAML
+====================================================================
+
+Classification (AUROC ↑)
+  maml_mlp:
+    K= 5: 0.6424 ± 0.0163  [AUROC]
+    K=10: 0.6464 ± 0.0187  [AUROC]
+    K=20: 0.6503 ± 0.0201  [AUROC]
+    K=50: 0.6540 ± 0.0154  [AUROC]
+  maml_static_gnn:
+    K= 5: 0.6337 ± 0.0119  [AUROC]
+    K=10: 0.6372 ± 0.0167  [AUROC]
+    K=20: 0.6406 ± 0.0174  [AUROC]
+    K=50: 0.6410 ± 0.0133  [AUROC]
+  maml_dense_gsl:
+    K= 5: 0.6319 ± 0.0210  [AUROC]
+    K=10: 0.6340 ± 0.0260  [AUROC]
+    K=20: 0.6394 ± 0.0252  [AUROC]
+    K=50: 0.6474 ± 0.0285  [AUROC]
+  maml_hopfield_nogating:
+    K= 5: 0.6377 ± 0.0225  [AUROC]
+    K=10: 0.6398 ± 0.0209  [AUROC]
+    K=20: 0.6437 ± 0.0211  [AUROC]
+    K=50: 0.6489 ± 0.0221  [AUROC]
+  maml_hopfield_evid:
+    K= 5: 0.6351 ± 0.0120  [AUROC]
+    K=10: 0.6378 ± 0.0124  [AUROC]
+    K=20: 0.6425 ± 0.0143  [AUROC]
+    K=50: 0.6461 ± 0.0131  [AUROC]
+  maml_hopfield_two_stage:
+    K= 5: 0.6248 ± 0.0000  [AUROC]
+    K=10: 0.6295 ± 0.0000  [AUROC]
+    K=20: 0.6309 ± 0.0000  [AUROC]
+    K=50: 0.6406 ± 0.0000  [AUROC]
+
+Regression     (RMSE  ↓)
+  maml_mlp:
+    K= 5: 14.0372 ± 0.2334  [RMSE]
+    K=10: 14.0495 ± 0.2621  [RMSE]
+    K=20: 13.9972 ± 0.1819  [RMSE]
+    K=50: 14.0692 ± 0.2407  [RMSE]
+  maml_static_gnn:
+    K= 5: 14.1588 ± 0.2591  [RMSE]
+    K=10: 14.1879 ± 0.3571  [RMSE]
+    K=20: 14.1185 ± 0.3813  [RMSE]
+    K=50: 14.2275 ± 0.4441  [RMSE]
+  maml_dense_gsl:
+    K= 5: 13.9893 ± 0.9248  [RMSE]
+    K=10: 13.9829 ± 0.9678  [RMSE]
+    K=20: 13.9925 ± 0.8633  [RMSE]
+    K=50: 13.9834 ± 0.7275  [RMSE]
+  maml_hopfield_nogating:
+    K= 5: 13.5373 ± 0.6833  [RMSE]
+    K=10: 13.4127 ± 0.4433  [RMSE]
+    K=20: 13.3762 ± 0.5146  [RMSE]
+    K=50: 13.4381 ± 0.5010  [RMSE]
+  maml_hopfield_evid:
+    K= 5: 13.1184 ± 0.5795  [RMSE]
+    K=10: 13.0241 ± 0.4749  [RMSE]
+    K=20: 12.9712 ± 0.4766  [RMSE]
+    K=50: 13.0172 ± 0.5647  [RMSE]
+  maml_hopfield_two_stage:
+    K= 5: 12.7559 ± 0.4468  [RMSE]
+    K=10: 12.5979 ± 0.2482  [RMSE]
+    K=20: 12.4836 ± 0.1968  [RMSE]
+    K=50: 12.5462 ± 0.1408  [RMSE]

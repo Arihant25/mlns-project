@@ -1,0 +1,15 @@
+==============================================================
+PoC 1 v3 — Transductive Semi-Supervised GSL (no pseudo-labels)
+==============================================================
+
+Exp A  Classification (AUROC ↑)
+  target_only              : 0.6241 ± 0.0105  [AUROC]
+  random_aug               : 0.6233 ± 0.0059  [AUROC]
+  similarity_only          : 0.6141 ± 0.0093  [AUROC]
+  evidential_oracle        : 0.6271 ± 0.0046  [AUROC]
+
+Exp B  Regression     (RMSE  ↓)
+  target_only              : 0.5356 ± 0.0146  [RMSE]
+  random_aug               : 0.5443 ± 0.0217  [RMSE]
+  similarity_only          : 0.4875 ± 0.0223  [RMSE]
+  evidential_oracle        : 0.5101 ± 0.0432  [RMSE]
