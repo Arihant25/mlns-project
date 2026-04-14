@@ -35,6 +35,6 @@ Format the final output table to explicitly separate the paradigms so reviewers 
     * Include our own `maml_static_gnn` baseline.
 * **Category 2: Context-Augmented (The Main Event)**
     * MHNfs (Your fresh run).
-    * `maml_hopfield_nogating` (no gate at all).
-    * `maml_hopfield_evid` ( only one stage gating)
+    * `maml_hopfield_stage_one_gating_only` 
+    * `maml_hopfield_stage_two_gating_only` 
     * `maml_hopfield_two_stage` (Our final model).
