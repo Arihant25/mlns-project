@@ -1,8 +1,7 @@
-Here is the concise, action-oriented handoff you can send to your colleague. 
-
 ***
 
 ### Hand-off: Scaling the Two-Stage Evidential Meta-Learner
+Refer meta/run_hopfield_poc.py for current setup
 
 **The TL;DR:** The core architecture (`maml_hopfield_two_stage`) is mathematically locked and proven on a small scale. It successfully combines an Entropy Gate (to block out-of-distribution context retrieval) with an Evidential Gate (to stabilize within-episode message passing). Your job is to scale the data infrastructure, run the rigorous evaluation protocol, and generate the final publication-ready results table.
 
@@ -36,5 +35,6 @@ Format the final output table to explicitly separate the paradigms so reviewers 
     * Include our own `maml_static_gnn` baseline.
 * **Category 2: Context-Augmented (The Main Event)**
     * MHNfs (Your fresh run).
-    * `maml_hopfield_nogating` (Our ablation).
+    * `maml_hopfield_nogating` (no gate at all).
+    * `maml_hopfield_evid` ( only one stage gating)
     * `maml_hopfield_two_stage` (Our final model).
