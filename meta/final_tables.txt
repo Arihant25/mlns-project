@@ -1,0 +1,84 @@
+====================================================================
+Paper Results Tables — Entropy-Gated Hopfield Meta-Learning
+====================================================================
+
+Loaded: 30 ablation-reg rows | 30 ablation-cls rows | 210 LOTO rows
+
+% ── TABLE 1 (MAIN): LOTO Regression  nRMSE↓ = RMSE/σ_task  (7 tasks × 5 seeds) ──
+  Folds present: ['Caco2_Wang', 'Clearance_Hepatocyte_AZ', 'Clearance_Microsome_AZ', 'Lipophilicity_AstraZeneca', 'PPBR_AZ', 'Solubility_AqSolDB', 'VDss_Lombardo']
+  Conditions:    ['maml_dense_gsl', 'maml_hopfield_evid', 'maml_hopfield_nogating', 'maml_hopfield_two_stage', 'maml_mlp', 'maml_static_gnn']
+
+\begin{table}[t]
+\caption{Few-Shot ADMET Regression (nRMSE $\downarrow$), LOTO Cross-Validation (7 tasks). nRMSE = RMSE / $\sigma_\text{task}$, averaged across folds.}
+\label{tab:loto}
+\centering
+\begin{tabular}{lccc}
+\toprule
+Model & K=10 & K=20 & K=50 \\ \midrule
+\multicolumn{4}{l}{\textit{Category 1: Strict Few-Shot (No Context Set)}} \\
+MAML-MLP & 1.0866 $\pm$ 0.1273 & 1.0639 $\pm$ 0.1172 & 1.0637 $\pm$ 0.1175 \\
+MAML-StaticGNN & 1.0753 $\pm$ 0.1191 & 1.0574 $\pm$ 0.1143 & 1.0553 $\pm$ 0.1126 \\
+MAML-DenseGSL & \textbf{1.0437 $\pm$ 0.0708} & \textbf{1.0239 $\pm$ 0.0626} & \textbf{1.0208 $\pm$ 0.0614} \\
+\midrule
+\multicolumn{4}{l}{\textit{Category 2: Context-Augmented Few-Shot}} \\
+MHNfs (re-impl.) & 1.0801 $\pm$ 0.0672 & 1.0620 $\pm$ 0.0643 & 1.0587 $\pm$ 0.0575 \\
+Ours (entropy gate) & 1.0851 $\pm$ 0.0571 & 1.0530 $\pm$ 0.0537 & 1.0410 $\pm$ 0.0344 \\
+Ours (two-stage)$^\dagger$ & 1.0601 $\pm$ 0.0961 & 1.0320 $\pm$ 0.0707 & 1.0310 $\pm$ 0.0599 \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\item $^\dagger$ Two-stage gating: entropy gate (context) + evidential gate (episode).
+\item MHNfs re-impl.: Hopfield cross-attention without gating, within our FOMAML framework.
+\end{tablenotes}
+\end{table}
+
+% ── TABLE 2 (ABLATION): PoC Regression  RMSE↓  (Caco2 + VDss, 5 seeds) ──
+\begin{table}[h]
+\caption{Ablation: Few-Shot ADMET Regression (RMSE $\downarrow$), 2 Test Tasks (Caco2, VDss)}
+\label{tab:ablation}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Model & K=5 & K=10 & K=20 & K=50 \\ \midrule
+\multicolumn{5}{l}{\textit{Category 1: No Context}} \\
+MAML-MLP & 14.0372 $\pm$ 0.2334 & 14.0495 $\pm$ 0.2621 & 13.9972 $\pm$ 0.1819 & 14.0692 $\pm$ 0.2407 \\
+MAML-StaticGNN & 14.1588 $\pm$ 0.2591 & 14.1879 $\pm$ 0.3571 & 14.1185 $\pm$ 0.3813 & 14.2275 $\pm$ 0.4441 \\
+MAML-DenseGSL & 13.9893 $\pm$ 0.9248 & 13.9829 $\pm$ 0.9678 & 13.9925 $\pm$ 0.8633 & 13.9834 $\pm$ 0.7275 \\
+\midrule
+\multicolumn{5}{l}{\textit{Category 2: Context-Augmented}} \\
+MHNfs (re-impl.) & 13.5373 $\pm$ 0.6833 & 13.4127 $\pm$ 0.4433 & 13.3762 $\pm$ 0.5146 & 13.4381 $\pm$ 0.5010 \\
+Ours (entropy gate) & 13.1184 $\pm$ 0.5795 & 13.0241 $\pm$ 0.4749 & 12.9712 $\pm$ 0.4766 & 13.0172 $\pm$ 0.5647 \\
+Ours (two-stage)$^\dagger$ & \textbf{12.7559 $\pm$ 0.4468} & \textbf{12.5979 $\pm$ 0.2482} & \textbf{12.4836 $\pm$ 0.1968} & \textbf{12.5462 $\pm$ 0.1408} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ── TABLE 3 (SUPPLEMENTARY): PoC Classification  AUROC↑  (HIA + CYP2C9-sub, 5 seeds) ──
+\begin{table}[h]
+\caption{Few-Shot ADMET Classification (AUROC $\uparrow$), 2 Test Tasks (HIA, CYP2C9-sub)}
+\label{tab:cls}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Model & K=5 & K=10 & K=20 & K=50 \\ \midrule
+\multicolumn{5}{l}{\textit{Category 1: No Context}} \\
+MAML-MLP & \textbf{0.6424 $\pm$ 0.0163} & \textbf{0.6464 $\pm$ 0.0187} & \textbf{0.6503 $\pm$ 0.0201} & \textbf{0.6540 $\pm$ 0.0154} \\
+MAML-StaticGNN & 0.6337 $\pm$ 0.0119 & 0.6372 $\pm$ 0.0167 & 0.6406 $\pm$ 0.0174 & 0.6410 $\pm$ 0.0133 \\
+MAML-DenseGSL & 0.6319 $\pm$ 0.0210 & 0.6340 $\pm$ 0.0260 & 0.6394 $\pm$ 0.0252 & 0.6474 $\pm$ 0.0285 \\
+\midrule
+\multicolumn{5}{l}{\textit{Category 2: Context-Augmented}} \\
+MHNfs (re-impl.) & 0.6377 $\pm$ 0.0225 & 0.6398 $\pm$ 0.0209 & 0.6437 $\pm$ 0.0211 & 0.6489 $\pm$ 0.0221 \\
+Ours (entropy gate) & 0.6351 $\pm$ 0.0120 & 0.6378 $\pm$ 0.0124 & 0.6425 $\pm$ 0.0143 & 0.6461 $\pm$ 0.0131 \\
+Ours (two-stage)$^\dagger$ & 0.6312 $\pm$ 0.0172 & 0.6339 $\pm$ 0.0171 & 0.6332 $\pm$ 0.0189 & 0.6393 $\pm$ 0.0101 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+% ── APPENDIX: Per-Task LOTO Breakdown ──
+
+  Per-task breakdown: Ours (two-stage)$^\dagger$
+
+  Per-task breakdown: Ours (entropy gate)
+
+  Per-task breakdown: MHNfs (re-impl.)
+

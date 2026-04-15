@@ -1,0 +1,16 @@
+[project]
+name = "mlns-project"
+version = "0.1.0"
+requires-python = ">=3.11"
+dependencies = [
+    "torch>=2.0.0",
+    "transformers==4.40.2",
+    "PyTDC",
+    "scikit-learn",
+    "scipy",
+    "requests",
+    "rdkit",
+    "xgboost",
+    "setuptools<71",
+    "chembl-webresource-client",
+]
