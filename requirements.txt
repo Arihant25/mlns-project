@@ -1,5 +1,5 @@
 torch
-transformers==4.40.2
+transformers==5.0.0rc3
 PyTDC
 scikit-learn
 scipy
@@ -8,4 +8,4 @@ rdkit
 xgboost
 minimol
 chemprop
-setuptools<71
+setuptools<79
