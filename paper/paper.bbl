@@ -1,0 +1,205 @@
+\begin{thebibliography}{26}
+\providecommand{\natexlab}[1]{#1}
+\providecommand{\url}[1]{\texttt{#1}}
+\expandafter\ifx\csname urlstyle\endcsname\relax
+  \providecommand{\doi}[1]{doi: #1}\else
+  \providecommand{\doi}{doi: \begingroup \urlstyle{rm}\Url}\fi
+
+\bibitem[Amini et~al.(2020)Amini, Schwarting, Soleimany, and
+  Rus]{amini2020deep}
+Amini, A., Schwarting, W., Soleimany, A., and Rus, D.
+\newblock Deep evidential regression.
+\newblock \emph{Advances in Neural Information Processing Systems}, 33, 2020.
+
+\bibitem[Anonymous(2025)]{unimatch2025}
+Anonymous.
+\newblock {UniMatch}: Universal matching from atom to task for few-shot drug
+  discovery.
+\newblock In \emph{International Conference on Learning Representations}, 2025.
+
+\bibitem[Bemis \& Murcko(1996)Bemis and Murcko]{lipkus1999murcko}
+Bemis, G.~W. and Murcko, M.~A.
+\newblock The scaffold tree - visualization of the scaffold universe by
+  hierarchical scaffold classification.
+\newblock \emph{Journal of Medicinal Chemistry}, 39\penalty0 (15):\penalty0
+  2887--2893, 1996.
+\newblock \doi{10.1021/jm9602928}.
+
+\bibitem[Chen et~al.(2023)Chen, Tripp, and
+  Hern{\'a}ndez-Lobato]{chen2023adkfift}
+Chen, W., Tripp, A., and Hern{\'a}ndez-Lobato, J.~M.
+\newblock Meta-learning adaptive deep kernel {G}aussian processes for molecular
+  property prediction.
+\newblock In \emph{International Conference on Learning Representations}, 2023.
+
+\bibitem[Finn et~al.(2017)Finn, Abbeel, and Levine]{finn2017maml}
+Finn, C., Abbeel, P., and Levine, S.
+\newblock Model-agnostic meta-learning for fast adaptation of deep networks.
+\newblock In \emph{Proceedings of the 34th International Conference on Machine
+  Learning}, volume~70, pp.\  1126--1135, 2017.
+
+\bibitem[Guo et~al.(2021)Guo, Zhang, Yu, Herr, Wiest, Jiang, and
+  Chawla]{guo2021metamgnn}
+Guo, Z., Zhang, C., Yu, W., Herr, J., Wiest, O., Jiang, M., and Chawla, N.~V.
+\newblock Few-shot graph learning for molecular property prediction.
+\newblock In \emph{Proceedings of the Web Conference 2021}, pp.\  2559--2567,
+  2021.
+\newblock \doi{10.1145/3442381.3450112}.
+
+\bibitem[Han et~al.(2025)Han, Zhou, Chen, Hao, Zhou, Wang, Feng, Chen, and
+  Wang]{han2025ungsl}
+Han, S., Zhou, Z., Chen, J., Hao, Z., Zhou, S., Wang, G., Feng, Y., Chen, C.,
+  and Wang, C.
+\newblock Uncertainty-aware graph structure learning.
+\newblock In \emph{Proceedings of the ACM Web Conference 2025}, 2025.
+\newblock \doi{10.1145/3696410.3714927}.
+
+\bibitem[Huang et~al.(2021)Huang, Fu, Gao, Zhao, Roohani, Leskovec, Coley,
+  Xiao, Sun, and Zitnik]{huang2021therapeutics}
+Huang, K., Fu, T., Gao, W., Zhao, Y., Roohani, Y., Leskovec, J., Coley, C.~W.,
+  Xiao, C., Sun, J., and Zitnik, M.
+\newblock Therapeutics data commons: Machine learning datasets and tasks for
+  drug discovery and development.
+\newblock \emph{Proceedings of Neural Information Processing Systems, NeurIPS
+  Datasets and Benchmarks}, 2021.
+
+\bibitem[Kipf \& Welling(2017)Kipf and Welling]{kipf2017gcn}
+Kipf, T.~N. and Welling, M.
+\newblock Semi-supervised classification with graph convolutional networks.
+\newblock In \emph{International Conference on Learning Representations}, 2017.
+
+\bibitem[Mendez et~al.(2019)Mendez, Gaulton, Bento, Chambers, De~Veij,
+  F{\'e}lix, Magari{\~n}os, Mosquera, Mutowo, Nowotka,
+  Gordillo-Mara{\~n}{\'o}n, Hunter, Junco, Mugumbate, Rodriguez-Lopez,
+  Atkinson, Bosc, Radoux, Segura-Cabrera, Hersey, and Leach]{mendez2019chembl}
+Mendez, D., Gaulton, A., Bento, A.~P., Chambers, J., De~Veij, M., F{\'e}lix,
+  E., Magari{\~n}os, M.~P., Mosquera, J.~F., Mutowo, P., Nowotka, M.,
+  Gordillo-Mara{\~n}{\'o}n, M., Hunter, F., Junco, L., Mugumbate, G.,
+  Rodriguez-Lopez, M., Atkinson, F., Bosc, N., Radoux, C.~J., Segura-Cabrera,
+  A., Hersey, A., and Leach, A.~R.
+\newblock {ChEMBL}: Towards direct deposition of bioassay data.
+\newblock \emph{Nucleic Acids Research}, 47\penalty0 (D1):\penalty0 D930--D940,
+  2019.
+\newblock \doi{10.1093/nar/gky1075}.
+
+\bibitem[Nichol et~al.(2018)Nichol, Achiam, and Schulman]{nichol2018reptile}
+Nichol, A., Achiam, J., and Schulman, J.
+\newblock On first-order meta-learning algorithms.
+\newblock In \emph{arXiv preprint arXiv:1803.02999}, 2018.
+
+\bibitem[Raghu et~al.(2020)Raghu, Raghu, Bengio, and Vinyals]{raghu2020rapid}
+Raghu, A., Raghu, M., Bengio, S., and Vinyals, O.
+\newblock Rapid learning or feature reuse? {T}owards understanding the
+  effectiveness of {MAML}.
+\newblock In \emph{International Conference on Learning Representations}, 2020.
+
+\bibitem[Ramsauer et~al.(2021)Ramsauer, Sch{\"a}fl, Lehner, Seidl, Widrich,
+  Gruber, Holzleitner, Adler, Kreil, Kopp, Klambauer, Brandstetter, and
+  Hochreiter]{ramsauer2021hopfield}
+Ramsauer, H., Sch{\"a}fl, B., Lehner, J., Seidl, P., Widrich, M., Gruber, L.,
+  Holzleitner, M., Adler, T., Kreil, D., Kopp, M.~K., Klambauer, G.,
+  Brandstetter, J., and Hochreiter, S.
+\newblock Hopfield networks is all you need.
+\newblock In \emph{International Conference on Learning Representations}, 2021.
+
+\bibitem[Ross et~al.(2022)Ross, Belgodere, Chenthamarakshan, Padhi, Mroueh, and
+  Das]{ross2022large}
+Ross, J., Belgodere, B., Chenthamarakshan, V., Padhi, I., Mroueh, Y., and Das,
+  P.
+\newblock Large-scale chemical language representations capture molecular
+  structure and properties.
+\newblock \emph{Nature Machine Intelligence}, 4\penalty0 (12):\penalty0
+  1256--1264, 2022.
+\newblock \doi{10.1038/s42256-022-00580-7}.
+
+\bibitem[Schimunek et~al.(2023)Schimunek, Seidl, Friedrich, Kuhn, Rippmann,
+  Hochreiter, and Klambauer]{schimunek2023mhnfsiclr}
+Schimunek, J., Seidl, P., Friedrich, L., Kuhn, D., Rippmann, F., Hochreiter,
+  S., and Klambauer, G.
+\newblock A context-enriched molecule representation improves few-shot drug
+  discovery.
+\newblock In \emph{International Conference on Learning Representations}, 2023.
+
+\bibitem[Schimunek et~al.(2024)Schimunek, Seidl, Friedrich, Kuhn, Rippmann,
+  Hochreiter, and Klambauer]{schimunek2024mhnfs}
+Schimunek, J., Seidl, P., Friedrich, L., Kuhn, D., Rippmann, F., Hochreiter,
+  S., and Klambauer, G.
+\newblock Prompting in-context bioactivity predictions for low-data drug
+  discovery.
+\newblock \emph{Journal of Chemical Information and Modeling}, 2024.
+\newblock \doi{10.1021/acs.jcim.4c02373}.
+
+\bibitem[Sensoy et~al.(2018)Sensoy, Kaplan, and Kandemir]{sensoy2018evidential}
+Sensoy, M., Kaplan, L., and Kandemir, M.
+\newblock Evidential deep learning to quantify classification uncertainty.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~31, 2018.
+
+\bibitem[Snell et~al.(2017)Snell, Swersky, and Zemel]{snell2017protonet}
+Snell, J., Swersky, K., and Zemel, R.
+\newblock Prototypical networks for few-shot learning.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~30, 2017.
+
+\bibitem[Soleimany et~al.(2021)Soleimany, Amini, Goldman, Rus, Bhatia, and
+  Coley]{soleimany2021evidential}
+Soleimany, A.~P., Amini, A., Goldman, S., Rus, D., Bhatia, S.~N., and Coley,
+  C.~W.
+\newblock Evidential deep learning for guided molecular property prediction and
+  discovery.
+\newblock \emph{ACS Central Science}, 7\penalty0 (8):\penalty0 1356--1367,
+  2021.
+\newblock \doi{10.1021/acscentsci.1c00546}.
+
+\bibitem[Stanley et~al.(2021)Stanley, Bronskill, Maziarz, Misztela, Lanini,
+  Segler, Schneider, and Brockschmidt]{stanley2021fsmol}
+Stanley, M., Bronskill, J.~F., Maziarz, K., Misztela, H., Lanini, J., Segler,
+  M., Schneider, N., and Brockschmidt, M.
+\newblock {FS-Mol}: A few-shot learning dataset of molecules.
+\newblock In \emph{Proceedings of the Neural Information Processing Systems
+  Datasets and Benchmarks Track}, 2021.
+
+\bibitem[Vaswani et~al.(2017)Vaswani, Shazeer, Parmar, Uszkoreit, Jones, Gomez,
+  Kaiser, and Polosukhin]{vaswani2017attention}
+Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A.~N.,
+  Kaiser, {\L}., and Polosukhin, I.
+\newblock Attention is all you need.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~30, 2017.
+
+\bibitem[Vinyals et~al.(2016)Vinyals, Blundell, Lillicrap, Kavukcuoglu, and
+  Wierstra]{vinyals2016matching}
+Vinyals, O., Blundell, C., Lillicrap, T., Kavukcuoglu, K., and Wierstra, D.
+\newblock Matching networks for one shot learning.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~29, 2016.
+
+\bibitem[Wang et~al.(2024)Wang, Liu, Liu, Sun, and Wu]{wang2024pintuning}
+Wang, L., Liu, Q., Liu, S., Sun, X., and Wu, S.
+\newblock Pin-tuning: Parameter-efficient in-context tuning for few-shot
+  molecular property prediction.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~37, 2024.
+
+\bibitem[Wang et~al.(2021)Wang, Abuduweili, Yao, and Dou]{wang2021par}
+Wang, Y., Abuduweili, A., Yao, Q., and Dou, D.
+\newblock Property-aware relation networks for few-shot molecular property
+  prediction.
+\newblock In \emph{Advances in Neural Information Processing Systems},
+  volume~34, 2021.
+
+\bibitem[Zhao et~al.(2024)Zhao, Xu, Guan, and Zhou]{zhao2024gslmpp}
+Zhao, B., Xu, W., Guan, J., and Zhou, S.
+\newblock Molecular property prediction based on graph structure learning.
+\newblock \emph{Bioinformatics}, 40\penalty0 (5):\penalty0 btae304, 2024.
+\newblock \doi{10.1093/bioinformatics/btae304}.
+
+\bibitem[Zhuang et~al.(2023)Zhuang, Zhang, Wu, Ding, Fang, and
+  Chen]{zhuang2023gsmeta}
+Zhuang, X., Zhang, Q., Wu, B., Ding, K., Fang, Y., and Chen, H.
+\newblock Graph sampling-based meta-learning for molecular property prediction.
+\newblock In \emph{Proceedings of the 32nd International Joint Conference on
+  Artificial Intelligence (IJCAI)}, pp.\  4729--4737, 2023.
+\newblock \doi{10.24963/ijcai.2023/526}.
+
+\end{thebibliography}

@@ -1,0 +1,18 @@
+\begin{table*}[t]
+\centering
+\small
+\caption{Per-task RMSE (lower is better) on seven TDC ADMET regression benchmarks under Leave-One-Task-Out (LOTO) cross-validation at $K=20$-shot. Mean $\pm$ standard deviation over 5 meta-training seeds. Best result per task in \textbf{bold}.}
+\label{tab:main_k20}
+\begin{tabular}{lccccccc}
+\toprule
+Method & Caco2 & VDss & PPBR & Lipo & AqSol & ClrM & ClrH \\
+\midrule
+MLP & 0.82$\pm$0.02 & 23.32$\pm$4.20 & 19.90$\pm$0.39 & 1.23$\pm$0.03 & 3.12$\pm$0.17 & 40.86$\pm$0.77 & 49.49$\pm$2.37 \\
+StaticGNN & 0.85$\pm$0.04 & 23.44$\pm$4.81 & 19.66$\pm$0.58 & 1.21$\pm$0.04 & 3.06$\pm$0.16 & \textbf{40.31}$\pm$0.87 & \textbf{48.55}$\pm$0.62 \\
+DenseGSL & 0.86$\pm$0.04 & 22.62$\pm$4.80 & 18.98$\pm$1.05 & \textbf{1.17}$\pm$0.01 & 2.64$\pm$0.15 & 41.88$\pm$2.15 & 49.13$\pm$3.57 \\
+Hop-NoGate & 0.86$\pm$0.10 & 23.76$\pm$3.47 & 19.13$\pm$0.50 & 1.21$\pm$0.11 & 2.82$\pm$0.35 & 44.67$\pm$0.95 & 50.11$\pm$2.37 \\
+Hop-Entropy & 0.88$\pm$0.11 & 22.59$\pm$5.15 & 19.95$\pm$0.75 & 1.20$\pm$0.02 & \textbf{2.60}$\pm$0.15 & 44.16$\pm$1.56 & 52.24$\pm$4.92 \\
+TwoStage (ours) & \textbf{0.81}$\pm$0.05 & \textbf{22.43}$\pm$4.73 & \textbf{18.97}$\pm$0.61 & 1.19$\pm$0.03 & 2.82$\pm$0.15 & 43.36$\pm$2.54 & 48.93$\pm$1.29 \\
+\bottomrule
+\end{tabular}
+\end{table*}

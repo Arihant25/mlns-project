@@ -1,0 +1,17 @@
+\begin{table}[t]
+\centering
+\small
+\caption{Statistical significance of TwoStage versus each baseline across 5 seeds per task ($K=10$). Each cell: sign of mean difference (TwoStage - baseline, where $+$ = TwoStage lower RMSE) and significance from a paired $t$-test. $\star\!:\! p\!<\!0.10$; $\star\star\!:\! p\!<\!0.05$; $\star\star\star\!:\! p\!<\!0.01$.}
+\label{tab:significance}
+\begin{tabular}{llccccccc}
+\toprule
+Baseline & & Caco2 & VDss & PPBR & Lipo & AqSol & ClrM & ClrH \\
+\midrule
+MLP & $K{=}10$ & $+$ & $+^{\star\star}$ & $+^{\star\star\star}$ & $+$ & $+$ & $-$ & $+$ \\
+StaticGNN & $K{=}10$ & $+^{\star\star\star}$ & $+$ & $+^{\star\star}$ & $-$ & $+$ & $-^{\star\star}$ & $+$ \\
+DenseGSL & $K{=}10$ & $+^{\star\star\star}$ & $-$ & $+$ & $-$ & $-^{\star\star\star}$ & $-^{\star\star}$ & $+$ \\
+Hop-NoGate & $K{=}10$ & $+$ & $+$ & $+$ & $+$ & $-$ & $+$ & $+^{\star}$ \\
+Hop-Entropy & $K{=}10$ & $+$ & $+$ & $+^{\star\star}$ & $+$ & $-^{\star\star}$ & $+$ & $+$ \\
+\bottomrule
+\end{tabular}
+\end{table}
