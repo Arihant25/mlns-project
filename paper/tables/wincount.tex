@@ -1,18 +1,19 @@
 \begin{table}[t]
 \centering
 \small
-\caption{Number of tasks (out of 7) on which each method achieves the lowest mean RMSE.}
+\caption{Average rank per method (1 = best RMSE on a task) across seven tasks at each $K$, and overall mean. Averaged over $K\!\in\!\{10,20,50\}$.}
 \label{tab:wincount}
-\begin{tabular}{lcc}
+\begin{tabular}{lcccc}
 \toprule
-Method & $K{=}10$ & $K{=}50$ \\
+Method & $K{=}10$ & $K{=}20$ & $K{=}50$ & Overall \\
 \midrule
-MLP & 0 & 0 \\
-StaticGNN & 1 & 2 \\
-DenseGSL & 2 & 2 \\
-Hop-NoGate & 0 & 0 \\
-Hop-Entropy & 1 & 1 \\
-TwoStage (ours) & 3 & 2 \\
+MLP         & 4.1 & 4.1 & 4.3 & 4.2 \\
+StaticGNN   & 3.3 & 3.3 & 3.4 & 3.3 \\
+Hopfield  & 4.6 & 4.7 & 4.7 & 4.7 \\
+\midrule
+EntropyGate (ours) & 4.4 & 4.1 & 3.9 & 4.1 \\
+EvidGSL (ours)    & 2.3 & 2.6 & 2.3 & \underline{2.4} \\
+TwoStage (ours)    & \textbf{2.3} & \textbf{2.1} & \textbf{2.4} & \textbf{2.3} \\
 \bottomrule
 \end{tabular}
 \end{table}

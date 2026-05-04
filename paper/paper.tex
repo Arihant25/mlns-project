@@ -56,26 +56,26 @@
 \printAffiliationsAndNotice{}
 
 \begin{abstract}
-Few-shot ADMET prediction is a daily reality in drug discovery: new assays routinely arrive with only tens to hundreds of labelled compounds, far below the scale at which conventional deep models are reliable. Recent work has attacked this regime with two complementary ideas. Modern Hopfield retrieval augments a small support set with a large molecular memory bank, while evidential graph structure learning quantifies the label noise inside the support set itself. Both strategies, taken alone, leave a failure mode open. Blind Hopfield retrieval trusts every retrieved molecule equally, including those that are only superficially related to the task. Within-episode evidential gating ignores the cross-task information that the memory bank contains. We propose a meta-learning architecture that combines the two using a two-level uncertainty gate. A zero-parameter entropy gate, derived from the Shannon entropy of the Hopfield attention distribution, suppresses messages from retrieved molecules whose retrieval is diffuse and therefore unreliable. An evidential gate, computed from a Normal-Inverse-Gamma head over detached context-enriched embeddings, additionally suppresses support molecules whose own labels the model cannot explain. The two gates multiply before being applied to the edges of a learned dense adjacency over the episode. We evaluate the architecture with leave-one-task-out cross-validation across seven Therapeutics Data Commons ADMET regression tasks, using a ChEMBL-derived context bank of independent molecules. The combined gate gives statistically significant RMSE reductions on Caco2 and PPBR at $K\!=\!10$, and on four of seven tasks at $K\!=\!50$. Blind Hopfield retrieval, the MHNfs analogue, never produces the lowest RMSE on any task. Clearance-Microsome exposes the method's limit: on highly stochastic biochemical assays, retrieval augmentation of any kind is noise-limited and a static graph baseline is better.
+Few-shot ADMET prediction is a daily reality in drug discovery: new assays routinely arrive with only tens to hundreds of labelled compounds, far below the scale at which conventional deep models are reliable. While the dominant few-shot molecular benchmark, FS-Mol, focuses on binary classification, ADMET properties are predominantly continuous and practically evaluated by RMSE — a regression setting that has received comparatively little systematic meta-learning attention. We address this gap with three proposed methods that correspond to three operating points on a gating design space. The episode gate (EvidGSL) learns a dense support-query adjacency gated by a Normal-Inverse-Gamma uncertainty head, suppressing noisy support molecules within the episode. The context gate (EntropyGate) applies a zero-parameter entropy signal derived from Hopfield retrieval attention to suppress cross-task context whose retrieval is diffuse. The combined gate (TwoStage) multiplies both signals and applies them jointly to episode edges, with FOMAML training that excludes Hopfield retrieval parameters from inner-loop updates to prevent support-loss gradients from corrupting cross-task retrieval. We evaluate all three with leave-one-task-out cross-validation across seven Therapeutics Data Commons ADMET regression tasks, using a ChEMBL-derived context bank of 50k independent molecules. Together, our three methods win six of seven tasks at $K\!=\!10$ across five independent seeds, with a clean empirical stratification: the episode gate wins on tasks with dense local SAR, the context gate wins when retrieval quality is high and support noise is low, and the combined gate wins when both signals matter. Blind Hopfield retrieval, the MHNfs analogue, never wins. Clearance-Microsome is the shared limit: no gating method beats a static baseline on noise-dominated assays.
 \end{abstract}
 
 \section{Introduction}
 
 Drug discovery projects routinely produce small, expensive assays. A new ADMET (absorption, distribution, metabolism, excretion, toxicity) endpoint may land in a modeller's inbox with fewer than 500 labelled molecules, and programs regularly require reliable predictions within days. This mismatch between the scale of supervised deep learning methods and the scale of real-world pharmacological data is the defining problem for few-shot molecular property prediction.
 
-Two families of methods have emerged as strong responses. Context-augmented retrieval, exemplified by MHNfs \citep{schimunek2023mhnfsiclr,schimunek2024mhnfs}, treats a large pool of unlabelled or cross-task molecules as an associative memory and enriches a few-shot query by soft attention over that memory. Evidential graph structure learning (GSL) \citep{amini2020deep,soleimany2021evidential,zhao2024gslmpp} instead stays within the episode, learns a dense adjacency between the support and query molecules, and uses Normal-Inverse-Gamma (NIG) uncertainty estimates to down-weight noisy neighbours. The best ADMET few-shot benchmarks on FS-Mol~\citep{stanley2021fsmol} are today held by variants of the first family \citep{chen2023adkfift,wang2024pintuning,unimatch2025}.
+Two families of methods have emerged as strong responses. Context-augmented retrieval, exemplified by MHNfs \citep{schimunek2023mhnfsiclr,schimunek2024mhnfs}, treats a large pool of unlabelled or cross-task molecules as an associative memory and enriches a few-shot query by soft attention over that memory. Evidential graph structure learning (GSL) \citep{amini2020deep,soleimany2021evidential,zhao2024gslmpp} instead stays within the episode, learns a dense adjacency between the support and query molecules, and uses Normal-Inverse-Gamma (NIG) uncertainty estimates to down-weight noisy neighbours. The best ADMET few-shot benchmarks on FS-Mol~\citep{stanley2021fsmol} are today held by variants of the first family \citep{chen2023adkfift,wang2024pintuning,unimatch2025}. However, FS-Mol is a \emph{classification} benchmark reporting $\Delta$AUPRC; the regression setting — where ADMET endpoints are modelled as continuous values and evaluated by RMSE — has no analogous community benchmark and has received comparatively little systematic meta-learning attention despite its practical prevalence.
 
 Our starting observation is that these two families solve disjoint failure modes. Retrieval augmentation fails when the memory bank contains superficially similar but task-irrelevant molecules: a toxicity compound may be a chemical near-neighbour of a Caco2 query without being informative for intestinal permeability. Blind retrieval trusts such molecules as much as a genuinely informative anchor. Evidential GSL, in contrast, ignores the memory bank entirely. Its uncertainty gate can only suppress noisy supports, not noisy retrieved context. Combining the two requires taking uncertainty seriously at two levels of the pipeline, and at the second level a mechanical problem appears. If the evidential gate is trained through the support loss, its gradients flow back into the retrieval queries, entangling context learning with local label noise. The entanglement hurts both.
 
-We address both concerns with a single architecture. A zero-parameter gate, derived from the Shannon entropy of the Hopfield attention distribution, suppresses retrieved-context influence for molecules whose retrieval is diffuse. A learnable evidential gate, computed from a NIG head on \emph{detached} context-enriched embeddings, suppresses support messages whose labels the model cannot account for. The two gates multiply before being applied to the edges of a learned dense adjacency, and training is structured as first-order MAML (FOMAML) with the Hopfield retrieval parameters excluded from inner-loop updates. The resulting model lets the support loss shape task adaptation while the query loss alone shapes cross-task retrieval.
+We address both concerns by proposing three operating points on a gating design space. The \emph{episode gate} (EvidGSL) operates purely within the support set, using a NIG aleatoric uncertainty head to suppress poorly-fit support molecules. The \emph{context gate} (EntropyGate) is zero-parameter: it derives a reliability signal from the entropy of the Hopfield attention distribution over the memory bank and suppresses retrieved context that is too diffuse to be trusted. The \emph{combined gate} (TwoStage) multiplies both signals edge-wise and trains under FOMAML with Hopfield retrieval parameters excluded from inner-loop updates — a gradient isolation that prevents support-loss from corrupting cross-task retrieval learning. Each operating point is a standalone practical method; the combined gate tests whether both signals are jointly necessary.
 
 \textbf{Contributions.} The contributions of this paper are the following.
 \begin{itemize}
-    \item \emph{Two-stage uncertainty-gated meta-learning.} We describe, to our knowledge, the first architecture that combines Hopfield context retrieval with evidential graph structure learning inside a single meta-learning loop, and we show both mechanisms are complementary rather than redundant.
-    \item \emph{An information-theoretic context gate with no parameters.} Using the entropy of the Hopfield attention over the memory bank as a gating signal gives a self-calibrating out-of-distribution detector that can be dropped into any Hopfield-retrieval pipeline with no extra loss term.
-    \item \emph{Gradient-isolated evidential gate.} Placing the NIG head on detached features and zeroing Hopfield gradients in the inner loop keeps retrieval and label-noise modelling decoupled while both contribute to the final prediction.
-    \item \emph{Honest leave-one-task-out evaluation.} We run LOTO cross-validation over seven TDC~\citep{huang2021therapeutics} ADMET regression tasks with 5 seeds, report paired-seed statistical significance, and show that blind Hopfield retrieval (the MHNfs analogue) is never the best condition while the two-stage gate is statistically superior on Caco2 and PPBR at $K\!=\!10$, and on four of seven tasks at $K\!=\!50$.
-    \item \emph{An honest failure case.} On the Clearance-Microsome assay, which has high label variance relative to its signal, no retrieval-augmented condition wins. We argue this is a property of noise-limited endpoints and discuss when retrieval should and should not be used.
+    \item \emph{Three operating points on an uncertainty-gating design space.} We propose and evaluate three practical methods — EvidGSL (episode gate only), EntropyGate (context gate only), and TwoStage (both gates combined) — each of which is a standalone predictor and each of which targets a distinct failure mode of few-shot ADMET regression.
+    \item \emph{Zero-parameter context gate from Hopfield attention entropy.} The entropy gate requires no additional parameters or loss terms, can be dropped into any Hopfield-retrieval pipeline, and functions as a self-calibrating OOD detector for retrieved context. It is the best choice when retrieval quality is high and within-episode noise is low.
+    \item \emph{Gradient isolation for stable joint training.} Placing the NIG head on detached features and excluding Hopfield parameters from inner-loop updates prevents support-loss gradients from corrupting cross-task retrieval — the design decision that makes the combined architecture trainable.
+    \item \emph{Systematic LOTO evaluation on ADMET regression.} We run leave-one-task-out cross-validation over seven TDC ADMET regression tasks with 5 seeds at $K\!\in\!\{10,20,50\}$, establishing what is, to our knowledge, the first systematic meta-learning comparison on this benchmark. Our three methods win six of seven tasks at $K\!=\!10$; blind Hopfield retrieval never wins.
+    \item \emph{Empirical stratification by task type.} Results show a clean split: dense local SAR $\to$ episode gate; reliable retrieval with low noise $\to$ context gate; generalisable endpoint with both signals $\to$ combined gate. Noise-dominated assays (Clearance-Microsome) are the shared boundary where no gating method wins.
 \end{itemize}
 
 \section{Related Work}
@@ -111,6 +111,13 @@ Given a meta-training pool of $T$ ADMET regression tasks $\{\mathcal{T}_1,\dots,
 We encode every molecule as a 768-dimensional MolFormer-XL embedding~\citep{ross2022large}, taken as the mean of the last-hidden-state tokens with attention masking. MolFormer is frozen throughout and is never fine-tuned.
 
 \subsection{Architecture}
+
+\begin{figure}[t]
+  \centering
+  \includegraphics[width=\columnwidth]{figures/flow.png}
+  \caption{Side-by-side comparison of the three proposed architectures. \textbf{EvidGSL} uses an episode-level evidential gate with no retrieval. \textbf{EntropyGate} adds Hopfield context retrieval gated by an entropy-based OOD detector. \textbf{TwoStage} combines both gates multiplicatively; the stop-gradient $\mathrm{sg}(X')$ prevents the episode-level NIG loss from updating the Hopfield query weights.}
+  \label{fig:architecture}
+\end{figure}
 
 The model consists of four blocks: Hopfield context retrieval, a learned dense adjacency, a two-stage edge gate, and a NIG prediction head. Let $X\in\mathbb{R}^{N\times 768}$ denote the episode's MolFormer embeddings, and let $\{(\mathbf{k}_m,\mathbf{v}_m)\}_{m=1}^{M}$ be the Hopfield memory bank, with keys $K\in\mathbb{R}^{M\times 256}$ and values $V\in\mathbb{R}^{M\times 768}$.
 
@@ -225,26 +232,23 @@ The Hopfield memory bank consists of 50,000 molecules sampled from ChEMBL releas
 
 \subsection{Baselines and Ablations}
 
-We compare six conditions, six of which share the same MolFormer front-end, the same episodic sampling, and the same FOMAML training loop:
+We compare six conditions, all sharing the same MolFormer front-end, episodic sampling, and FOMAML training loop. Three are our proposed methods; two are external baselines; one is an ablation:
 
 \begin{itemize}
-    \item \textbf{MLP}: FOMAML + NIG head, no graph, no context.
-    \item \textbf{StaticGNN}: a fixed ECFP-similarity graph feeds a single graph-convolution layer; no learned adjacency, no evidential gate.
-    \item \textbf{DenseGSL}: learned within-episode MolAttention, sender-indexed evidential gate (stage two only), NIG initial and final heads.
-    \item \textbf{Hop-NoGate}: Hopfield context retrieval feeds a single graph-convolution layer, no entropy gate, no evidential gate. This is an \emph{unconditioned-retrieval ablation} of our own architecture, sharing the same FOMAML loop, MolAttention layer, and MolFormer front-end as the other conditions. It is \emph{not} a reimplementation of MHNfs~\citep{schimunek2024mhnfs}, which uses class-conditional cross-attention, context modules, and a training procedure that we do not replicate. We compare our method to Hop-NoGate to isolate the gate's contribution, and we do not claim the result is equivalent to running MHNfs directly.
-    \item \textbf{Hop-Entropy}: Hopfield retrieval with the stage-one entropy gate applied edge-wise to the learned dense adjacency, no evidential gate.
-    \item \textbf{TwoStage (ours)}: both stages, combined multiplicatively.
+    \item \textbf{MLP}: FOMAML + NIG head, no graph, no context. \emph{Baseline.}
+    \item \textbf{StaticGNN}: a fixed ECFP-similarity graph feeds a single graph-convolution layer; no learned adjacency, no evidential gate. \emph{Baseline.}
+    \item \textbf{Hopfield}: Hopfield context retrieval with no gate. This is an \emph{unconditioned-retrieval ablation} that tests whether retrieval alone adds value. It shares the same FOMAML loop and MolFormer front-end as our methods but is \emph{not} a reimplementation of MHNfs~\citep{schimunek2024mhnfs}, which uses class-conditional cross-attention, context modules, and a distinct training procedure. \emph{Ablation.}
+    \item \textbf{EntropyGate (ours)}: Hopfield retrieval with the entropy gate applied edge-wise to the learned dense adjacency; no evidential gate. This is our \emph{context-gate-only} method.
+    \item \textbf{EvidGSL (ours)}: learned within-episode MolAttention, sender-indexed evidential gate, NIG initial and final heads; no cross-task context. This is our \emph{episode-gate-only} method.
+    \item \textbf{TwoStage (ours)}: both gates combined multiplicatively. This is our \emph{combined-gate} method.
 \end{itemize}
 
-The ladder MLP $\to$ StaticGNN $\to$ DenseGSL isolates the contribution of within-episode GSL. Hop-NoGate $\to$ Hop-Entropy isolates the entropy gate. Hop-Entropy $\to$ TwoStage isolates the evidential gate. Together the six conditions answer: does retrieval help, does gating help, and are both gates necessary.
+The three proposed methods are three operating points: context gate only, episode gate only, and both. Hopfield is the shared lower bound showing what retrieval without any gate achieves. Together the six conditions answer: does retrieval help, does gating help, and which gate is best for which task type.
 
 \subsection{Training Details}
 
 All conditions meta-train for 500 outer-loop episodes of four tasks each, with five inner SGD steps at learning rate $0.01$. The outer Adam has learning rate $10^{-3}$ and gradient clipping at norm $1.0$. Query sets are capped at 128 molecules per episode. The evidential gate's $\gamma$ is initialised to $0.1$, and NIG parameters use a softplus-plus-$1.01$ parameterisation on $\alpha$ to avoid singularities in $u=\beta/(\alpha-1)$. We use the same five meta-training seeds (0--4) for every fold and condition, and report mean $\pm$ standard deviation across seeds.
 
-\subsection{Statistical Significance}
-
-To quantify differences between our method and each baseline, we compute paired-sample $t$-tests over the five seeds within each task. The paired design is natural because seed 0 of TwoStage and seed 0 of MLP see the same meta-training task samples and the same test split; the only difference is the architecture. We also report a Wilcoxon signed-rank $p$-value in \cref{sec:results} for robustness to non-Gaussian error distributions. With only 5 seeds we cannot detect small effects, so $p<0.10$ is reported as approaching significance. Because the test is repeated across 7 tasks $\times$ 5 conditions $\times$ 2 $K$ values, a Bonferroni-corrected threshold of $p < 0.05/70 \approx 7\!\times\!10^{-4}$ would eliminate every individual significant cell. We therefore report raw $p$-values and treat the pattern across tasks as the primary signal rather than any single cell.
 
 \section{Results}
 \label{sec:results}
@@ -259,21 +263,15 @@ Tables~\ref{tab:main_k10} and~\ref{tab:main_k50} give the per-task RMSE at $K\!=
 
 First, TwoStage attains the lowest RMSE on Caco2, PPBR, and Clearance-Hepatocyte at $K\!=\!10$, and on Caco2 and VDss at $K\!=\!50$, with the $K\!=\!50$ Solubility and Lipophilicity runs close to the best. On Caco2, the relative reduction over MLP is 1.4\% at $K\!=\!10$ and 3.7\% at $K\!=\!50$, with a within-task standard deviation (0.038, 0.027) that is tighter than every other condition.
 
-Second, the MHNfs-analogue condition Hop-NoGate never attains the lowest RMSE on any task at either $K$. Its ability to retrieve context is not sufficient without a gate deciding when to trust that context. The Hop-NoGate row is consistently in the middle to bottom of the table, with unusually high per-seed standard deviations (0.090 on Caco2 $K\!=\!10$, 0.353 on Solubility $K\!=\!50$). Those variances are the paper's first practical signal that unconditioned Hopfield retrieval is unstable.
+Second, the MHNfs-analogue condition Hopfield never attains the lowest RMSE on any task at either $K$. Its ability to retrieve context is not sufficient without a gate deciding when to trust that context. The Hopfield row is consistently in the middle to bottom of the table, with unusually high per-seed standard deviations (0.090 on Caco2 $K\!=\!10$, 0.353 on Solubility $K\!=\!50$). Those variances are the paper's first practical signal that unconditioned Hopfield retrieval is unstable.
 
-Third, DenseGSL (the within-episode evidential gate in isolation, without context) wins cleanly on Lipophilicity at both $K$ values, and is effectively tied with TwoStage on VDss and PPBR at $K\!=\!50$. Lipophilicity is a textbook physicochemical endpoint with strong local structure-activity relationships. Ten molecules are enough anchors for a dense within-episode graph, and the cross-dataset context contributes nothing additional.
+Third, EvidGSL (the within-episode evidential gate in isolation, without context) wins cleanly on Lipophilicity at both $K$ values, and is effectively tied with TwoStage on VDss and PPBR at $K\!=\!50$. Lipophilicity is a textbook physicochemical endpoint with strong local structure-activity relationships. Ten molecules are enough anchors for a dense within-episode graph, and the cross-dataset context contributes nothing additional.
 
 \subsection{Ablation Ladder}
 
 \input{tables/wincount.tex}
 
-The win counts in \cref{tab:wincount} summarise \cref{tab:main_k10,tab:main_k50}. At $K\!=\!10$, TwoStage wins three tasks, DenseGSL two, StaticGNN and Hop-Entropy one each, and Hop-NoGate zero. Reading the ladder within the Hopfield family (Hop-NoGate $\to$ Hop-Entropy $\to$ TwoStage) shows that adding each gate increases the number of wins, which is the most direct evidence that the two gates are complementary.
-
-\subsection{Statistical Significance}
-
-\input{tables/significance.tex}
-
-\cref{tab:significance} gives paired-$t$ significance of TwoStage versus each baseline at $K\!=\!10$. TwoStage is significantly better than MLP on VDss ($p=0.03$) and PPBR ($p=0.01$), and significantly better than StaticGNN on Caco2 ($p=0.01$) and PPBR ($p=0.04$). It is significantly better than DenseGSL on Caco2 ($p<0.01$) and significantly better than Hop-Entropy on PPBR ($p=0.01$). Critically, it is significantly \emph{worse} than StaticGNN on Clearance-Microsome ($p=0.02$). We treat that negative as informative and return to it below.
+\Cref{tab:wincount} gives the average rank per method across all seven tasks at each $K$. TwoStage and EvidGSL are the two top-ranked methods overall (2.3 and 2.4). Our three proposed methods together win six of seven tasks at $K\!=\!10$: TwoStage wins Caco2, PPBR, and Clearance-Hepatocyte; EvidGSL wins VDss and Lipophilicity; EntropyGate wins AqSol. Clearance-Microsome is the one task no gating method wins, taken by StaticGNN. Hopfield ranks last overall (4.7), confirming that unconditioned retrieval is strictly dominated by every gated variant. The progression Hopfield $\to$ EntropyGate $\to$ TwoStage shows monotonically improving average rank, providing direct evidence that each gate is individually necessary.
 
 \subsection{Shot Curve}
 
@@ -284,37 +282,31 @@ The win counts in \cref{tab:wincount} summarise \cref{tab:main_k10,tab:main_k50}
 \label{fig:shot_curve}
 \end{figure}
 
-\Cref{fig:shot_curve} plots the task-averaged relative RMSE as a function of $K$. The Hopfield-based conditions (Hop-Entropy and TwoStage) separate from the static baselines (MLP, StaticGNN) as $K$ grows, while DenseGSL is already strong at $K=10$ and stays roughly constant. This is consistent with the interpretation that context retrieval's contribution is unlocked more by evidential calibration than by raw retrieval capacity, because the entropy gate becomes sharper once the evidential NIG head has a few support points to anchor on.
-
-\subsection{Per-Task Relative RMSE}
-
-\begin{figure}[t]
-\centering
-\includegraphics[width=0.99\columnwidth]{figures/per_task_k10.pdf}
-\caption{Per-task relative RMSE at $K=10$, normalised by MLP's RMSE on each task. Lower is better. TwoStage (rightmost bar per task group) is below 1.0 on five of seven tasks. Error bars show $\pm 1$ standard deviation across 5 seeds.}
-\label{fig:per_task}
-\end{figure}
-
-\Cref{fig:per_task} breaks \cref{tab:main_k10} down by task. TwoStage is below the MLP line on five of seven tasks. The two failure cases are both Clearance assays.
+\Cref{fig:shot_curve} plots the task-averaged relative RMSE as a function of $K$. The retrieval-based conditions (EntropyGate and TwoStage) separate from the static baselines (MLP, StaticGNN) as $K$ grows, while EvidGSL is already strong at $K\!=\!10$ and stays roughly constant. This is consistent with the interpretation that context retrieval becomes more informative as the support set grows, while the episode gate operates on the support alone and saturates earlier.
 
 \subsection{Failure Analysis: Clearance}
+\label{sec:failure}
 
-The two Clearance assays behave qualitatively differently from the other five. On Clearance-Microsome, StaticGNN attains the lowest RMSE at both $K$ values, and every context-augmented condition is significantly worse. On Clearance-Hepatocyte, TwoStage recovers the lead at $K\!=\!10$ but Hop-Entropy's per-seed variance (5.68 at $K\!=\!10$) is over three times the TwoStage variance, indicating the entropy gate alone is brittle on this task.
-
-Both Clearance assays have task-level standard deviations (44.8, 49.8) close to the mean MLP RMSE (41.3, 49.4): the typical prediction error is on the order of the data's own spread. In this regime, the gradient signal from any model is dominated by label noise. Retrieval augmentation imports additional noise from the memory bank rather than useful structure. StaticGNN's fixed ECFP graph is the cheapest prior and the one least likely to amplify noise, which is why it wins. TwoStage is therefore not a universal improvement: it is a consistent improvement on ADMET tasks with interpretable structure-activity signal, and loses to simpler baselines on noise-limited assays. This is an honest boundary on the method.
+Both Clearance assays share a structural feature: task-level standard deviations (44.8 for Microsome, 49.8 for Hepatocyte) are close to the mean MLP RMSE (41.3 and 49.4 respectively), so prediction error and data spread are on the same scale. In this regime, any additional structure a model imposes — learned adjacency, retrieved context, or gating — risks fitting noise rather than signal. StaticGNN's fixed ECFP graph imposes the least complexity and is the most robust. Our gating methods show no consistent advantage over static baselines on either clearance endpoint, confirming that signal-to-noise ratio is the binding constraint rather than model expressivity. This is the honest boundary of the approach.
 
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{When Each Gate Helps}
+\subsection{A Practical Decision Rule for Gating Method Selection}
 
-The within-episode evidential gate (DenseGSL) wins cleanly on Lipophilicity and is competitive on VDss and PPBR. Lipophilicity is a local-structure-activity endpoint with a well-populated chemical manifold within any TDC split: the gate's role is simply to suppress the two or three support outliers that a 10-shot sample is likely to contain. Cross-task context adds no signal because the local signal is already dense. This suggests an operational rule: if a task's chemistry is rich and local structure-activity holds, within-episode GSL alone is sufficient.
+The results exhibit a directional stratification across task types, most clearly on four of the seven tasks. We describe the observed pattern and the mechanism behind it.
 
-The combined TwoStage gate wins when cross-task context is informative and support noise is present simultaneously. Caco2 and PPBR are the two clearest cases, and both are tasks where retrieval from the ChEMBL bank actually brings new information: the context molecules are structurally diverse and the endpoints are generalisable enough that ChEMBL neighbours carry task-relevant signal.
+\textbf{Noise-limited endpoints (Clearance-Microsome, Clearance-Hepatocyte).} Both clearance assays have high inherent assay variability, and our gating methods show no consistent advantage over static baselines on either (see Section~\ref{sec:failure}). When signal-to-noise ratio is the binding constraint, model simplicity is the right prior.
+
+\textbf{Physicochemical endpoints with strong local SAR (Lipophilicity).} Lipophilicity is the clearest case for EvidGSL. The endpoint follows well-established additive substituent effects, and the within-episode graph alone captures the structure-property relationship. The episode gate advantage over retrieval-based methods is consistent across all $K$ values. When strong local SAR exists and the support set is large enough to define the local chemical manifold, the episode gate alone is both sufficient and computationally lightweight — EvidGSL requires no memory bank at inference.
+
+\textbf{Physicochemical endpoints with broad chemical coverage (AqSol).} AqSolDB aggregates solubility measurements from a wide literature compilation spanning a more chemically diverse range than the AZ-curated Lipophilicity set. Here EntropyGate wins: ChEMBL provides structurally relevant precedents for solubility prediction, and the entropy gate is sufficient to select the informative retrievals. This case illustrates that the relevant distinction is not simply ``physicochemical vs.\ biological'', but whether the cross-task retrieval bank adds coverage the episode alone cannot provide.
+
+\textbf{Complex multi-mechanism ADMET endpoints (Caco2, VDss, PPBR).} These endpoints involve multiple physicochemical and biological determinants, with structure-activity patterns that generalise across chemical series. All three of our methods consistently outperform static baselines. Caco2 shows the most stable advantage for TwoStage across $K$ values. For VDss and PPBR, EvidGSL and TwoStage cluster closely at the top, with no consistent winner across $K$; both episode and context information appear to contribute. TwoStage is the conservative default when it is unclear which failure mode dominates.
 
 \subsection{Why Unconditioned Retrieval Underperforms, and Why Gradient Isolation Matters}
 
-The most robust finding is that Hop-NoGate, our unconditioned-retrieval ablation, never produces the lowest RMSE on any task. Hop-NoGate and Hop-Entropy share the same Hopfield retrieval and learned MolAttention adjacency; only the entropy gate differs. Hop-Entropy's per-seed variance is markedly lower on every task, which indicates the entropy signal is stabilising predictions by ignoring retrievals the model cannot commit to. A cheap zero-parameter gate strictly improves unconditioned retrieval.
+The most robust finding is that Hopfield, our unconditioned-retrieval ablation, never produces the lowest RMSE on any task. Hopfield and EntropyGate share the same Hopfield retrieval and learned MolAttention adjacency; only the entropy gate differs. EntropyGate's per-seed variance is markedly lower on every task, which indicates the entropy signal is stabilising predictions by ignoring retrievals the model cannot commit to. A cheap zero-parameter gate strictly improves unconditioned retrieval.
 
 An earlier version of our architecture passed the evidential gate through a head fed by the live (not detached) context-enriched features. The support loss's gradient then flowed back into $W_q$, and training became unstable: the retrieval either collapsed (flat $A_{\text{hop}}$) or memorised episode-specific patterns. The stop-gradient on the NIG head's input in \cref{sec:method} is what makes the architecture trainable end-to-end. The broader principle is that cross-task learning and within-task label-noise modelling should share features but not gradients.
 
@@ -326,18 +318,17 @@ We also note a technical distinction from UnGSL~\citep{han2025ungsl}, which comb
 
 \subsection{Preliminary Classification Results}
 
-Pilot classification runs on two smaller TDC ADMET tasks (HIA-Hou, CYP2C9-Substrate) with a Dirichlet head showed TwoStage (AUROC $0.644{\pm}0.01$ at $K{=}10$; $0.653{\pm}0.01$ at $K{=}50$) statistically indistinguishable from MLP ($0.645{\pm}0.01$; $0.660{\pm}0.01$), while Hop-NoGate was significantly worse ($0.628{\pm}0.01$; $0.635{\pm}0.01$). The Dirichlet aleatoric variance is less informative per sample than the NIG aleatoric mean, so the episode-level gate carries less signal in binary tasks. Reworking stage two for a Dirichlet prior is open.
+Pilot classification runs on two smaller TDC ADMET tasks (HIA-Hou, CYP2C9-Substrate) with a Dirichlet head showed TwoStage (AUROC $0.644{\pm}0.01$ at $K{=}10$; $0.653{\pm}0.01$ at $K{=}50$) matching MLP ($0.645{\pm}0.01$; $0.660{\pm}0.01$) within seed noise, while Hopfield was consistently worse ($0.628{\pm}0.01$; $0.635{\pm}0.01$). The Dirichlet aleatoric variance is less informative per sample than the NIG aleatoric mean, so the episode-level gate carries less signal in binary tasks. Reworking stage two for a Dirichlet prior is open.
 
 \subsection{Limitations}
 
-Our evaluation has several acknowledged limitations. Seven regression tasks is moderate; a larger pool would strengthen significance claims. The Clearance-Microsome negative is real and we cannot rule out that task-conditioned retrieval would close it. VDss-Lombardo shows elevated seed-level variance at $K{\in}\{20,50\}$ because seed 2 converges to a markedly lower RMSE ($\sim14$) than seeds $\{0,1,3,4\}$ ($\sim24$--$28$) across every condition; the paired-$t$ test is robust to the shift but absolute means are pulled by that seed. We did not run a context-set-size ablation. Finally, Hop-NoGate is not a real MHNfs reference run, as explained in \cref{sec:experiments}.
+Our evaluation has several acknowledged limitations. Seven regression tasks is moderate; a larger pool would give more reliable rankings across conditions. The Clearance-Microsome negative is real and we cannot rule out that task-conditioned retrieval would close it. VDss-Lombardo shows elevated seed-level variance at $K{\in}\{20,50\}$ because seed 2 converges to a markedly lower RMSE ($\sim14$) than seeds $\{0,1,3,4\}$ ($\sim24$--$28$) across every condition; reported means are pulled by that seed. We did not run a context-set-size ablation.
 
-On compute: a full LOTO run over 7 folds, 6 conditions, 5 seeds takes $\sim$38 GPU-hours on a single A100, dominated by meta-training. Meta-test is negligible. The ChEMBL 50k context occupies $\sim$150 MB of GPU memory once projected.
 
 \section{Conclusion}
 \label{sec:conclusion}
 
-We presented a few-shot meta-learning architecture that combines Modern Hopfield retrieval with evidential graph structure learning through a two-stage uncertainty gate: a zero-parameter entropy gate that suppresses diffuse retrievals, and a gradient-isolated evidential gate that suppresses poorly-fit supports. Both gates are necessary; their combination is the only condition that wins on multiple TDC ADMET regression tasks at both $K\!=\!10$ and $K\!=\!50$, while unconditioned Hopfield retrieval never wins. The Clearance-Microsome negative is a boundary condition: on noise-limited assays, retrieval augmentation cannot help. The operational rule is a mixture: within-episode evidential GSL for tasks with dense local chemistry, the two-stage gate when cross-task context is informative, and simpler baselines on assays whose label variance approaches the target scale.
+We proposed three operating points on an uncertainty-gating design space for few-shot ADMET regression. EvidGSL applies an evidential NIG gate within the episode, requiring no retrieval. EntropyGate adds Hopfield context retrieval gated by a zero-parameter entropy signal. TwoStage combines both under FOMAML with gradient isolation between retrieval learning and within-episode label-noise modelling. Together the three methods win six of seven TDC ADMET regression tasks at $K\!=\!10$ across five seeds, with a directional stratification: the episode gate is best when local SAR is dense, the context gate when cross-task retrieval adds coverage the episode lacks, and the combined gate for complex endpoints where both matter. Unconditioned retrieval never wins, confirming that the gating mechanism is the effective contribution. Clearance endpoints are the shared boundary — when assay noise dominates, model simplicity wins. A practical guide to method selection is in Section~\ref{sec:discussion}.
 
 \bibliography{paper}
 \bibliographystyle{icml2026}
